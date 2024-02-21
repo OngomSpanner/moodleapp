@@ -70,12 +70,12 @@
     "wsservice": "moodle_mobile_app",
     "demo_sites": {
         "student": {
-            "url": "https://school.moodledemo.net",
+            "url": "https://mubsep.mubs.ac.ug",
             "username": "student",
             "password": "moodle"
         },
         "teacher": {
-            "url": "https://school.moodledemo.net",
+            "url": "https://mubsep.mubs.ac.ug",
             "username": "teacher",
             "password": "moodle"
         }
