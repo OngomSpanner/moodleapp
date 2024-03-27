@@ -11,14 +11,14 @@
 
     .message-box {
         --background: var(--message-background);
-        --min-height: var(--a11y-min-target-size);
+        --min-height: var(--a11y-sizing-minTargetSize);
 
         display: flex;
         flex-direction: row;
         position: relative;
 
         border: 0;
-        border-radius: var(--radius-sm);
+        border-radius: var(--mdl-shape-borderRadius-sm);
         margin: 8px;
         width: 90%;
         max-width: var(--list-item-max-width);
@@ -34,8 +34,8 @@
         overflow: visible;
 
         &:hover {
-            -webkit-filter: drop-shadow(2px 2px 2px rgba(0,0,0,.3));
-            filter: drop-shadow(2px 2px 2px rgba(0,0,0,.3));
+            -webkit-filter: drop-shadow(2px 2px 2px rgb(0 0 0 / 30%));
+            filter: drop-shadow(2px 2px 2px rgb(0 0 0 / 30%));
         }
 
         &[tappable]:active {

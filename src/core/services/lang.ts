@@ -16,7 +16,6 @@ import { Injectable } from '@angular/core';
 
 import { CoreConstants } from '@/core/constants';
 import { LangChangeEvent } from '@ngx-translate/core';
-import { CoreAppProvider } from '@services/app';
 import { CoreConfig } from '@services/config';
 import { CoreSubscriptions } from '@singletons/subscriptions';
 import { makeSingleton, Translate, Http } from '@singletons';
@@ -28,6 +27,7 @@ import { AddonFilterMultilangHandler } from '@addons/filter/multilang/services/h
 import { AddonFilterMultilang2Handler } from '@addons/filter/multilang2/services/handlers/multilang2';
 import { firstValueFrom } from 'rxjs';
 import { CoreLogger } from '@singletons/logger';
+import { CoreSites } from './sites';
 
 /*
  * Service to handle language features, like changing the current language.
@@ -71,7 +71,7 @@ export class CoreLangProvider {
 
         let language: string;
 
-        if (CoreAppProvider.isAutomated()) {
+        if (CorePlatform.isAutomated()) {
             // Force current language to English when Behat is running.
             language = 'en';
         } else {
@@ -380,14 +380,22 @@ export class CoreLangProvider {
     /**
      * Loads custom strings obtained from site.
      *
-     * @param currentSite Current site object.
+     * @param currentSite Current site object. If not defined, use current site.
      */
-    loadCustomStringsFromSite(currentSite: CoreSite): void {
+    loadCustomStringsFromSite(currentSite?: CoreSite): void {
+        currentSite = currentSite ?? CoreSites.getCurrentSite();
+
+        if (!currentSite) {
+            return;
+        }
+
         const customStrings = currentSite.getStoredConfig('tool_mobile_customlangstrings');
 
-        if (customStrings !== undefined) {
-            this.loadCustomStrings(customStrings);
+        if (customStrings === undefined) {
+            return;
         }
+
+        this.loadCustomStrings(customStrings);
     }
 
     /**

@@ -38,6 +38,7 @@
     <preference name="load-url-timeout" value="60000" />
     <preference name="AutoHideSplashScreen" value="false" />
     <preference name="android-minSdkVersion" value="24" />
+    <preference name="android-minSdkVersion" value="24" />
     <preference name="android-targetSdkVersion" value="33" />
     <preference name="AndroidPersistentFileLocation" value="Compatibility" />
     <preference name="AndroidInsecureFileModeEnabled" value="true" />
@@ -48,6 +49,7 @@
     <preference name="WKFullScreenEnabled" value="false" />
     <preference name="AndroidXEnabled" value="true" />
     <preference name="GradlePluginGoogleServicesEnabled" value="true" />
+    <preference name="GradlePluginGoogleServicesVersion" value="4.3.15" />
     <preference name="GradlePluginGoogleServicesVersion" value="4.3.15" />
     <preference name="GradlePluginKotlinVersion" value="1.7.21" />
     <preference name="StatusBarOverlaysWebView" value="false" />
@@ -73,24 +75,11 @@
         <config-file parent="/manifest/application" target="AndroidManifest.xml">
             <meta-data android:name="firebase_analytics_collection_deactivated" android:value="true" />
         </config-file>
-        <config-file parent="/*" target="AndroidManifest.xml">
-            <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
-            <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-        </config-file>
     </platform>
     <platform name="ios">
         <resource-file src="GoogleService-Info.plist" />
-        <edit-config file="*-Info.plist" mode="merge" target="NSLocationWhenInUseUsageDescription">
-            <string>We need your location so you can attach it as part of your submissions.</string>
-        </edit-config>
-        <edit-config file="*-Info.plist" mode="merge" target="NSLocationAlwaysUsageDescription">
-            <string>We need your location so you can attach it as part of your submissions.</string>
-        </edit-config>
         <edit-config file="*-Info.plist" mode="merge" target="NSCameraUsageDescription">
             <string>We need camera access to take pictures so you can attach them as part of your submissions.</string>
-        </edit-config>
-        <edit-config file="*-Info.plist" mode="merge" target="NSMicrophoneUsageDescription">
-            <string>We need microphone access to record sounds so you can attach them as part of your submissions.</string>
         </edit-config>
         <edit-config file="*-Info.plist" mode="merge" target="NSPhotoLibraryUsageDescription">
             <string>We need photo library access to get pictures from there so you can attach them as part of your submissions.</string>

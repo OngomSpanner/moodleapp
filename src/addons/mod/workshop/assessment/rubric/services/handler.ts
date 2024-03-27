@@ -18,11 +18,20 @@ import {
     ADDON_MOD_WORKSHOP_ASSESSMENT_STRATEGY_RUBRIC_NAME,
     ADDON_MOD_WORKSHOP_ASSESSMENT_STRATEGY_RUBRIC_STRATEGY_NAME,
 } from '@addons/mod/workshop/assessment/constants';
+import type { AddonModWorkshopAssessmentStrategyRubricHandlerLazyService } from './handler-lazy';
 
-export class AddonModWorkshopAssessmentStrategyRubricHandlerService {
+export class AddonModWorkshopAssessmentStrategyRubricHandlerService
+    implements Partial<AddonWorkshopAssessmentStrategyHandler> {
 
     name = ADDON_MOD_WORKSHOP_ASSESSMENT_STRATEGY_RUBRIC_NAME;
     strategyName = ADDON_MOD_WORKSHOP_ASSESSMENT_STRATEGY_RUBRIC_STRATEGY_NAME;
+
+    /**
+     * @inheritdoc
+     */
+    async isEnabled(): Promise<boolean> {
+        return true;
+    }
 
 }
 
@@ -32,13 +41,22 @@ export class AddonModWorkshopAssessmentStrategyRubricHandlerService {
  * @returns Assessment strategy handler.
  */
 export function getAssessmentStrategyHandlerInstance(): AddonWorkshopAssessmentStrategyHandler {
-    const lazyHandler = asyncInstance(async () => {
+    const lazyHandler = asyncInstance<
+        AddonModWorkshopAssessmentStrategyRubricHandlerLazyService,
+        AddonModWorkshopAssessmentStrategyRubricHandlerService
+    >(async () => {
         const { AddonModWorkshopAssessmentStrategyRubricHandler } = await import('./handler-lazy');
 
         return AddonModWorkshopAssessmentStrategyRubricHandler.instance;
     });
 
     lazyHandler.setEagerInstance(new AddonModWorkshopAssessmentStrategyRubricHandlerService());
+    lazyHandler.setLazyMethods([
+        'getComponent',
+        'getOriginalValues',
+        'hasDataChanged',
+        'prepareAssessmentData',
+    ]);
 
     return lazyHandler;
 }

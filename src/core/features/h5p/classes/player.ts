@@ -145,7 +145,7 @@ export class CoreH5PPlayer {
 
         const fileEntry = await CoreFile.writeFile(indexPath, html);
 
-        return fileEntry.toURL();
+        return CoreFile.getFileEntryURL(fileEntry);
     }
 
     /**
@@ -296,6 +296,11 @@ export class CoreH5PPlayer {
         }
         if (otherOptions.state !== undefined) {
             params.state = otherOptions.state;
+        }
+
+        const customCssUrl = await CoreUtils.ignoreErrors(CoreH5P.getCustomCssSrc(siteId));
+        if (customCssUrl) {
+            params.customCssUrl = customCssUrl;
         }
 
         return CoreUrlUtils.addParamsToUrl(path, params);

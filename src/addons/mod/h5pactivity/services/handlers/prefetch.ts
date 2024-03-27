@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { CoreConstants } from '@/core/constants';
+import { DownloadStatus } from '@/core/constants';
 import { Injectable } from '@angular/core';
 
 import { CoreCourseActivityPrefetchHandlerBase } from '@features/course/classes/activity-prefetch-handler';
@@ -115,6 +115,7 @@ export class AddonModH5PActivityPrefetchHandlerService extends CoreCourseActivit
             this.prefetchWSData(h5pActivity, siteId),
             CoreFilepool.addFilesToQueue(siteId, introFiles, AddonModH5PActivityProvider.COMPONENT, module.id),
             this.prefetchMainFile(module, h5pActivity, siteId),
+            CoreH5P.getCustomCssSrc(siteId),
         ]);
     }
 
@@ -144,7 +145,7 @@ export class AddonModH5PActivityPrefetchHandlerService extends CoreCourseActivit
             // If the file needs to be downloaded, delete the states because it means the package has changed or user deleted it.
             const fileState = await CoreFilepool.getFileStateByUrl(siteId, CoreFileHelper.getFileUrl(deployedFile));
 
-            if (fileState !== CoreConstants.DOWNLOADED) {
+            if (fileState !== DownloadStatus.DOWNLOADED) {
                 await CoreUtils.ignoreErrors(CoreXAPIOffline.deleteStates(AddonModH5PActivityProvider.TRACK_COMPONENT, {
                     itemId: h5pActivity.context,
                     siteId,

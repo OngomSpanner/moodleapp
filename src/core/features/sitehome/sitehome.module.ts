@@ -20,11 +20,19 @@ import { CoreContentLinksDelegate } from '@features/contentlinks/services/conten
 import { CoreSiteHomeHomeHandler, CoreSiteHomeHomeHandlerService } from './services/handlers/sitehome-home';
 import { CoreMainMenuHomeDelegate } from '@features/mainmenu/services/home-delegate';
 import { CoreMainMenuHomeRoutingModule } from '@features/mainmenu/mainmenu-home-routing.module';
-import { CoreSiteHomeProvider } from './services/sitehome';
 
-export const CORE_SITEHOME_SERVICES: Type<unknown>[] = [
-    CoreSiteHomeProvider,
-];
+/**
+ * Get site home services.
+ *
+ * @returns Returns site home services.
+ */
+export async function getSiteHomeServices(): Promise<Type<unknown>[]> {
+    const { CoreSiteHomeProvider } = await import('@features/sitehome/services/sitehome');
+
+    return [
+        CoreSiteHomeProvider,
+    ];
+}
 
 const mainMenuHomeRoutes: Routes = [
     {
@@ -35,7 +43,6 @@ const mainMenuHomeRoutes: Routes = [
 
 @NgModule({
     imports: [CoreMainMenuHomeRoutingModule.forChild({ children: mainMenuHomeRoutes })],
-    exports: [CoreMainMenuHomeRoutingModule],
     providers: [
         {
             provide: APP_INITIALIZER,

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { APP_INITIALIZER, NgModule, Type } from '@angular/core';
+import { APP_INITIALIZER, NgModule } from '@angular/core';
 import { Routes } from '@angular/router';
 import { CoreContentLinksDelegate } from '@features/contentlinks/services/contentlinks-delegate';
 import { CoreCourseHelper } from '@features/course/services/course-helper';
@@ -22,7 +22,6 @@ import { CoreMainMenuTabRoutingModule } from '@features/mainmenu/mainmenu-tab-ro
 import { CoreTagAreaDelegate } from '@features/tag/services/tag-area-delegate';
 import { CoreCronDelegate } from '@services/cron';
 import { CORE_SITE_SCHEMAS } from '@services/sites';
-import { AddonModWikiComponentsModule } from './components/components.module';
 import { OFFLINE_SITE_SCHEMA } from './services/database/wiki';
 import { AddonModWikiCreateLinkHandler } from './services/handlers/create-link';
 import { AddonModWikiEditLinkHandler } from './services/handlers/edit-link';
@@ -34,14 +33,6 @@ import { AddonModWikiPrefetchHandler } from './services/handlers/prefetch';
 import { AddonModWikiSyncCronHandler } from './services/handlers/sync-cron';
 import { AddonModWikiTagAreaHandler } from './services/handlers/tag-area';
 import { AddonModWikiProvider } from './services/wiki';
-import { AddonModWikiOfflineProvider } from './services/wiki-offline';
-import { AddonModWikiSyncProvider } from './services/wiki-sync';
-
-export const ADDON_MOD_WIKI_SERVICES: Type<unknown>[] = [
-    AddonModWikiProvider,
-    AddonModWikiOfflineProvider,
-    AddonModWikiSyncProvider,
-];
 
 const routes: Routes = [
     {
@@ -53,7 +44,6 @@ const routes: Routes = [
 @NgModule({
     imports: [
         CoreMainMenuTabRoutingModule.forChild(routes),
-        AddonModWikiComponentsModule,
     ],
     providers: [
         {

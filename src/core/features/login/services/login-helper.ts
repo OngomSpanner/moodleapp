@@ -39,7 +39,6 @@ import { CorePushNotifications } from '@features/pushnotifications/services/push
 import { CorePath } from '@singletons/path';
 import { CorePromisedValue } from '@classes/promised-value';
 import { SafeHtml } from '@angular/platform-browser';
-import { CoreLoginError } from '@classes/errors/loginerror';
 import { CoreSettingsHelper } from '@features/settings/services/settings-helper';
 import {
     CoreSiteIdentityProvider,
@@ -87,30 +86,12 @@ export class CoreLoginHelperProvider {
      *
      * @param siteId Site ID. If not defined, current site.
      * @returns Promise resolved if success, rejected if failure.
+     * @deprecated since 4.4. Use CorePolicy.acceptMandatoryPolicies instead.
      */
     async acceptSitePolicy(siteId?: string): Promise<void> {
-        const site = await CoreSites.getSite(siteId);
+        const { CorePolicy } = await import('@features/policy/services/policy');
 
-        const result = await site.write<AgreeSitePolicyResult>('core_user_agree_site_policy', {});
-
-        if (result.status) {
-            return;
-        }
-
-        if (!result.warnings?.length) {
-            throw new CoreError('Cannot agree site policy');
-        }
-
-        // Check if there is a warning 'alreadyagreed'.
-        const found = result.warnings.some((warning) => warning.warningcode === 'alreadyagreed');
-        if (found) {
-            // Policy already agreed, treat it as a success.
-            return;
-        }
-
-        // Another warning, reject.
-        throw new CoreWSError(result.warnings[0]);
-
+        return CorePolicy.acceptMandatorySitePolicies(siteId);
     }
 
     /**
@@ -287,35 +268,26 @@ export class CoreLoginHelperProvider {
     }
 
     /**
+     * Get email signup settings.
+     *
+     * @param siteUrl Site URL.
+     * @returns Signup settings.
+     */
+    async getEmailSignupSettings(siteUrl: string): Promise<AuthEmailSignupSettings> {
+        return await CoreWS.callAjax('auth_email_get_signup_settings', {}, { siteUrl });
+    }
+
+    /**
      * Get the site policy.
      *
      * @param siteId Site ID. If not defined, current site.
      * @returns Promise resolved with the site policy.
+     * @deprecated since 4.4. Use CorePolicy.getSitePoliciesURL instead.
      */
     async getSitePolicy(siteId?: string): Promise<string> {
-        const site = await CoreSites.getSite(siteId);
+        const { CorePolicy } = await import('@features/policy/services/policy');
 
-        let sitePolicy: string | undefined;
-
-        try {
-            // Try to get the latest config, maybe the site policy was just added or has changed.
-            sitePolicy = await site.getConfig('sitepolicy', true);
-        } catch (error) {
-            // Cannot get config, try to get the site policy using auth_email_get_signup_settings.
-            const settings = <AuthEmailSignupSettings> await CoreWS.callAjax(
-                'auth_email_get_signup_settings',
-                {},
-                { siteUrl: site.getURL() },
-            );
-
-            sitePolicy = settings.sitepolicy;
-        }
-
-        if (!sitePolicy) {
-            throw new CoreError('Cannot retrieve site policy');
-        }
-
-        return sitePolicy;
+        return CorePolicy.getSitePoliciesURL(siteId);
     }
 
     /**
@@ -943,8 +915,8 @@ export class CoreLoginHelperProvider {
     /**
      * Show a modal warning that the credentials introduced were not correct.
      */
-    protected showInvalidLoginModal(error: CoreLoginError): void {
-        CoreDomUtils.showErrorModal(error.errorDetails ?? error.message);
+    protected showInvalidLoginModal(error: CoreWSError): void {
+        CoreDomUtils.showErrorModal(error.message);
     }
 
     /**
@@ -1067,20 +1039,13 @@ export class CoreLoginHelperProvider {
      * Function called when site policy is not agreed. Reserved for core use.
      *
      * @param siteId Site ID. If not defined, current site.
+     * @returns void
+     * @deprecated since 4.4. Use CorePolicy.goToAcceptSitePolicies instead.
      */
-    sitePolicyNotAgreed(siteId?: string): void {
-        siteId = siteId || CoreSites.getCurrentSiteId();
-        if (!siteId || siteId != CoreSites.getCurrentSiteId()) {
-            // Only current site allowed.
-            return;
-        }
+    async sitePolicyNotAgreed(siteId?: string): Promise<void> {
+        const { CorePolicy } = await import('@features/policy/services/policy');
 
-        // If current page is already site policy, stop.
-        if (CoreNavigator.isCurrent('/login/sitepolicy')) {
-            return;
-        }
-
-        CoreNavigator.navigate('/login/sitepolicy', { params: { siteId }, reset: true });
+        return CorePolicy.goToAcceptSitePolicies(siteId);
     }
 
     /**
@@ -1536,14 +1501,6 @@ export type CoreLoginSSOData = CoreRedirectPayload & {
 };
 
 /**
- * Result of WS core_user_agree_site_policy.
- */
-type AgreeSitePolicyResult = {
-    status: boolean; // Status: true only if we set the policyagreed to 1 for the user.
-    warnings?: CoreWSExternalWarning[];
-};
-
-/**
  * Result of WS auth_email_get_signup_settings.
  */
 export type AuthEmailSignupSettings = {
@@ -1553,6 +1510,7 @@ export type AuthEmailSignupSettings = {
     sitepolicyhandler?: string; // Site policy handler.
     defaultcity?: string; // Default city.
     country?: string; // Default country.
+    extendedusernamechars?: boolean; // @since 4.4. Extended characters in usernames or no.
     profilefields?: AuthEmailSignupProfileField[]; // Required profile fields.
     recaptchapublickey?: string; // Recaptcha public key.
     recaptchachallengehash?: string; // Recaptcha challenge hash.

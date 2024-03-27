@@ -1,4 +1,4 @@
-@mod @mod_quiz @app @javascript @lms_from3.10 @lms_upto3.11
+@addon_mod_quiz @app @javascript @lms_from3.10 @lms_upto3.11
 Feature: Attempt a quiz in app
   As a student
   In order to demonstrate what I know
@@ -125,7 +125,7 @@ Feature: Attempt a quiz in app
     Then I should find "Summary of attempt" in the app
 
     When I press "Submit all and finish" in the app
-    And I press "OK" near "Once you submit" in the app
+    And I press "Submit" near "Once you submit" in the app
     Then I should find "Review" in the app
     And I should find "Started on" in the app
     And I should find "State" in the app
@@ -158,12 +158,9 @@ Feature: Attempt a quiz in app
     And I press "Next" in the app
     And I press "True" in the app
     And I press "Next" in the app
-    And I press "Choose... , frog" in the app
-    And I press "amphibian" in the app
-    And I press "Choose... , newt" in the app
-    And I press "insect" in the app
-    And I press "Choose... , cat" in the app
-    And I press "mammal" in the app
+    And I set the field "frog" to "amphibian" in the app
+    And I set the field "newt" to "insect" in the app
+    And I set the field "cat" to "mammal" in the app
     And I press "Next" in the app
     Then I should find "Text of the eighth question" in the app
 
@@ -184,7 +181,7 @@ Feature: Attempt a quiz in app
     But I should not find "Not yet answered" in the app
 
     When I press "Submit all and finish" in the app
-    And I press "OK" in the app
+    And I press "Submit" in the app
     Then I should find "Review" in the app
     And I should find "Finished" in the app
     And I should find "Not yet graded" in the app
@@ -203,7 +200,7 @@ Feature: Attempt a quiz in app
     And I press "False" in the app
     And I press "Submit" in the app
     And I press "Submit all and finish" in the app
-    And I press "OK" in the app
+    And I press "Submit" in the app
     Then I should find "Review" in the app
 
     When I replace "/.*/" within "page-addon-mod-quiz-review core-loading > ion-card ion-item:nth-child(1) p:nth-child(2)" with "[Started on date]"

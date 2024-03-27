@@ -18,7 +18,7 @@ import { CoreCustomURLSchemes, CoreCustomURLSchemesProvider } from '@services/ur
 import { ONBOARDING_DONE } from '@features/login/constants';
 import { CoreConfig } from '@services/config';
 import { EnvironmentConfig } from '@/types/config';
-import { LocalNotifications, makeSingleton, NgZone } from '@singletons';
+import { LocalNotifications, makeSingleton, NgZone, ToastController } from '@singletons';
 import { CoreNetwork, CoreNetworkService } from '@services/network';
 import { CorePushNotifications, CorePushNotificationsProvider } from '@features/pushnotifications/services/pushnotifications';
 import { CoreCronDelegate, CoreCronDelegateService } from '@services/cron';
@@ -30,6 +30,10 @@ import { CoreSites, CoreSitesProvider } from '@services/sites';
 import { CoreNavigator, CoreNavigatorService } from '@services/navigator';
 import { CoreSwipeNavigationDirective } from '@directives/swipe-navigation';
 import { Swiper } from 'swiper';
+import { LocalNotificationsMock } from '@features/emulator/services/local-notifications';
+import { GetClosureArgs } from '@/core/utils/types';
+import { CoreIframeComponent } from '@components/iframe/iframe';
+import { CoreUtils } from '@services/utils/utils';
 
 /**
  * Behat runtime servive with public API.
@@ -38,6 +42,10 @@ import { Swiper } from 'swiper';
 export class TestingBehatRuntimeService {
 
     protected initialized = false;
+    protected openedUrls: {
+        args: GetClosureArgs<Window['open']>;
+        contents?: string;
+    }[] = [];
 
     get cronDelegate(): CoreCronDelegateService {
         return CoreCronDelegate.instance;
@@ -89,6 +97,17 @@ export class TestingBehatRuntimeService {
             document.cookie = 'MoodleAppConfig=' + JSON.stringify(options.configOverrides);
             CoreConfig.patchEnvironment(options.configOverrides, { patchDefault: true });
         }
+
+        // Spy on window.open.
+        const originalOpen = window.open.bind(window);
+        window.open = (...args) => {
+            this.openedUrls.push({ args });
+
+            return originalOpen(...args);
+        };
+
+        // Reduce iframes timeout to speed up tests.
+        CoreIframeComponent.loadingTimeout = 1000;
     }
 
     /**
@@ -271,6 +290,45 @@ export class TestingBehatRuntimeService {
         } catch (error) {
             return 'ERROR: ' + error.message;
         }
+    }
+
+    /**
+     * Check whether the given url has been opened in the app.
+     *
+     * @param urlPattern Url pattern.
+     * @param contents Url contents.
+     * @param times How many times it should have been opened.
+     * @returns OK if successful, or ERROR: followed by message
+     */
+    async hasOpenedUrl(urlPattern: string, contents: string, times: number): Promise<string> {
+        const urlRegExp = new RegExp(urlPattern);
+        const urlMatches = await Promise.all(this.openedUrls.map(async (openedUrl) => {
+            const renderedUrl = openedUrl.args[0]?.toString() ?? '';
+
+            if (!urlRegExp.test(renderedUrl)) {
+                return false;
+            }
+
+            if (contents && !('contents' in openedUrl)) {
+                const response = await fetch(renderedUrl);
+
+                openedUrl.contents = await response.text();
+            }
+
+            if (contents && contents !== openedUrl.contents) {
+                return false;
+            }
+
+            return true;
+        }));
+
+        if (urlMatches.filter(matches => !!matches).length === times) {
+            return 'OK';
+        }
+
+        return times === 1
+            ? `ERROR: Url matching '${urlPattern}' with '${contents}' contents has not been opened once`
+            : `ERROR: Url matching '${urlPattern}' with '${contents}' contents has not been opened ${times} times`;
     }
 
     /**
@@ -586,6 +644,13 @@ export class TestingBehatRuntimeService {
     }
 
     /**
+     * Flush pending notifications.
+     */
+    flushNotifications(): void {
+        (LocalNotifications as unknown as LocalNotificationsMock).flush();
+    }
+
+    /**
      * Check a notification is present.
      *
      * @param title Title of the notification
@@ -606,6 +671,23 @@ export class TestingBehatRuntimeService {
         }
 
         return (await LocalNotifications.isPresent(notification.id)) ? 'YES' : 'NO';
+    }
+
+    /**
+     * Check a notification is scheduled.
+     *
+     * @param title Title of the notification
+     * @param date Scheduled notification date.
+     * @returns YES or NO: depending on the result.
+     */
+    async notificationIsScheduledWithText(title: string, date?: number): Promise<string> {
+        const notifications = await LocalNotifications.getAllScheduled();
+
+        const notification = notifications.find(
+            (notification) => notification.title?.includes(title) && (!date || notification.trigger?.at?.getTime() === date),
+        );
+
+        return notification ? 'YES' : 'NO';
     }
 
     /**
@@ -662,6 +744,15 @@ export class TestingBehatRuntimeService {
         direction === 'left' ? ionContent.swipeNavigation.swipeLeft() : ionContent.swipeNavigation.swipeRight();
 
         return 'OK';
+    }
+
+    /**
+     * Wait for toast to be dismissed in the app.
+     *
+     * @returns Promise resolved when toast has been dismissed.
+     */
+    async waitToastDismiss(): Promise<void> {
+        await CoreUtils.ignoreErrors(ToastController.dismiss());
     }
 
 }

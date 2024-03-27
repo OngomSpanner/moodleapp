@@ -271,9 +271,12 @@ export class AddonModQuizPlayerPage implements OnInit, OnDestroy, CanLeave {
             await this.scrollToQuestion(slot);
 
             return;
-        } else if ((page == this.attempt.currentpage && !this.showSummary) || (fromModal && this.isSequential && page != -1)) {
+        } else if (
+            (page == this.attempt.currentpage && !this.showSummary) ||
+            (fromModal && this.isSequential && page != this.attempt.currentpage && page !== this.nextPage)
+        ) {
             // If the user is navigating to the current page we do nothing.
-            // Also, in sequential quizzes we don't allow navigating using the modal except for finishing the quiz (summary).
+            // Also, in sequential quizzes we can only navigate to the current page.
             return;
         } else if (page === -1 && this.showSummary) {
             // Summary already shown.
@@ -406,7 +409,34 @@ export class AddonModQuizPlayerPage implements OnInit, OnDestroy, CanLeave {
         try {
             // Show confirm if the user clicked the finish button and the quiz is in progress.
             if (!timeUp && this.attempt.state == AddonModQuizProvider.ATTEMPT_IN_PROGRESS) {
-                await CoreDomUtils.showConfirm(Translate.instant('addon.mod_quiz.confirmclose'));
+                let message = Translate.instant('addon.mod_quiz.confirmclose');
+
+                const unansweredCount = this.summaryQuestions
+                    .filter(question => AddonModQuiz.isQuestionUnanswered(question))
+                    .length;
+
+                if (!this.isSequential && unansweredCount > 0) {
+                    const warning = Translate.instant(
+                        'addon.mod_quiz.submission_confirmation_unanswered',
+                        { $a: unansweredCount },
+                    );
+
+                    message += `
+                        <ion-card class="core-warning-card">
+                            <ion-item>
+                                <ion-label>
+                                    ${ warning }
+                                </ion-label>
+                            </ion-item>
+                        </ion-card>
+                    `;
+                }
+
+                await CoreDomUtils.showConfirm(
+                    message,
+                    Translate.instant('addon.mod_quiz.submitallandfinish'),
+                    Translate.instant('core.submit'),
+                );
             }
 
             modal = await CoreDomUtils.showModalLoading('core.sending', true);
@@ -532,8 +562,6 @@ export class AddonModQuizPlayerPage implements OnInit, OnDestroy, CanLeave {
             return;
         }
 
-        // @todo MOBILE-4350: This is called before getting the attempt data in sequential quizzes as a workaround for a bug
-        // in the LMS. Once the bug has been fixed, this should be reverted.
         if (this.isSequential) {
             await this.logViewPage(page);
         }
@@ -567,7 +595,6 @@ export class AddonModQuizPlayerPage implements OnInit, OnDestroy, CanLeave {
 
         // Mark the page as viewed.
         if (!this.isSequential) {
-            // @todo MOBILE-4350: Undo workaround.
             await this.logViewPage(page);
         }
 
@@ -706,7 +733,9 @@ export class AddonModQuizPlayerPage implements OnInit, OnDestroy, CanLeave {
                 navigation: this.navigation,
                 summaryShown: this.showSummary,
                 currentPage: this.attempt?.currentpage,
+                nextPage: this.nextPage,
                 isReview: false,
+                isSequential: this.isSequential,
             },
         });
 

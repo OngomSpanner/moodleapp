@@ -57,7 +57,6 @@ class behat_app extends behat_app_helper {
         }
 
         $this->featurepath = dirname($feature->getFile());
-        $this->configure_performance_logs();
     }
 
     /**
@@ -80,23 +79,6 @@ class behat_app extends behat_app_helper {
         }
 
         $this->enter_site();
-    }
-
-    /**
-     * Configure performance logs.
-     */
-    protected function configure_performance_logs() {
-        global $CFG;
-
-        $performanceLogs = $CFG->behat_profiles['default']['capabilities']['extra_capabilities']['goog:loggingPrefs']['performance'] ?? null;
-
-        if ($performanceLogs !== 'ALL') {
-            return;
-        }
-
-        // Enable DB Logging only for app tests with performance logs activated.
-        $this->getSession()->visit($this->get_app_url() . '/assets/env.json');
-        $this->execute_script("document.cookie = 'MoodleAppDBLoggingEnabled=true;path=/';");
     }
 
     /**
@@ -955,6 +937,38 @@ class behat_app extends behat_app_helper {
     }
 
     /**
+     * Check that the app opened a url.
+     *
+     * @Then /^the app should( not)? have opened url "([^"]+)"(?: with contents "([^"]+)")?(?: (once|\d+ times))?$/
+     * @param bool $not Whether to check if the app did not open the url
+     * @param string $urlpattern Url pattern
+     * @param string $contents Url contents
+     * @param string $times How many times the url should have been opened
+     */
+    public function the_app_should_have_opened_url(bool $not, string $urlpattern, ?string $contents = null, ?string $times = null) {
+        if (is_null($times) || $times === 'once') {
+            $times = 1;
+        } else {
+            $times = intval(substr($times, 0, strlen($times) - 6));
+        }
+
+        $this->spin(function() use ($not, $urlpattern, $contents, $times) {
+            $result = $this->runtime_js("hasOpenedUrl('$urlpattern', '$contents', $times)");
+
+            // TODO process times
+            if ($not && $result === 'OK') {
+                throw new DriverException('Error, an url was opened that should not have');
+            }
+
+            if (!$not && $result !== 'OK') {
+                throw new DriverException('Error asserting that url was opened - ' . $result);
+            }
+
+            return true;
+        });
+    }
+
+    /**
      * Switches to a newly-opened browser tab.
      *
      * This assumes the app opened a new tab.
@@ -1074,28 +1088,82 @@ class behat_app extends behat_app_helper {
 
 
     /**
+     * Send pending notifications.
+     *
+     * @Then /^I flush pending notifications in the app$/
+     */
+    public function i_flush_notifications() {
+        $this->runtime_js("flushNotifications()");
+    }
+
+    /**
      * Check if a notification has been triggered and is present.
      *
-     * @Then /^a notification with title (".+") is( not)? present in the app$/
+     * @Then /^a notification with title (".+") should( not)? be present in the app$/
      * @param string $title Notification title
      * @param bool $not Whether assert that the notification was not found
      */
     public function notification_present_in_the_app(string $title, bool $not = false) {
-        $result = $this->runtime_js("notificationIsPresentWithText($title)");
+        $this->spin(function() use ($not, $title) {
+            $result = $this->runtime_js("notificationIsPresentWithText($title)");
 
-        if ($not && $result === 'YES') {
-            throw new ExpectationException("Notification is present", $this->getSession()->getDriver());
+            if ($not && $result === 'YES') {
+                throw new ExpectationException("Notification is present", $this->getSession()->getDriver());
+            }
+
+            if (!$not && $result === 'NO') {
+                throw new ExpectationException("Notification is not present", $this->getSession()->getDriver());
+            }
+
+            if ($result !== 'YES' && $result !== 'NO') {
+                throw new DriverException('Error checking notification - ' . $result);
+            }
+
+            return true;
+        });
+    }
+
+    /**
+     * Check if a notification has been scheduled.
+     *
+     * @Then /^a notification with title (".+") should( not)? be scheduled(?: (\d+) minutes before the "(.+)" assignment due date)? in the app$/
+     * @param string $title Notification title
+     * @param bool $not Whether assert that the notification was not scheduled
+     * @param int $minutes Minutes before the assignment at which the notification was scheduled
+     * @param string $assignment Assignment for which the notification was scheduled
+     */
+    public function notification_scheduled_in_the_app(string $title, bool $not = false, ?int $minutes = null, ?string $assignment = null) {
+        if (!is_null($minutes)) {
+            global $DB;
+
+            $assign = $DB->get_record('assign', ['name' => $assignment]);
+
+            if (!$assign) {
+                throw new ExpectationException("Couldn't find '$assignment' assignment", $this->getSession()->getDriver());
+            }
+
+            $date = ($assign->duedate - $minutes * 60) * 1000;
+        } else {
+            $date = 'undefined';
         }
 
-        if (!$not && $result === 'NO') {
-            throw new ExpectationException("Notification is not present", $this->getSession()->getDriver());
-        }
+        $this->spin(function() use ($not, $title, $date) {
+            $result = $this->runtime_js("notificationIsScheduledWithText($title, $date)");
 
-        if ($result !== 'YES' && $result !== 'NO') {
-            throw new DriverException('Error checking notification - ' . $result);
-        }
+            if ($not && $result === 'YES') {
+                throw new ExpectationException("Notification is scheduled", $this->getSession()->getDriver());
+            }
 
-        return true;
+            if (!$not && $result === 'NO') {
+                throw new ExpectationException("Notification is not scheduled", $this->getSession()->getDriver());
+            }
+
+            if ($result !== 'YES' && $result !== 'NO') {
+                throw new DriverException('Error checking scheduled notification - ' . $result);
+            }
+
+            return true;
+        });
     }
 
     /**
@@ -1141,6 +1209,15 @@ class behat_app extends behat_app_helper {
      */
     public function i_change_viewport_size_in_the_app(int $width, int $height) {
         $this->resize_app_window($width, $height);
+    }
+
+    /**
+     * Wait until Toast disappears.
+     *
+     * @When I wait toast to dismiss in the app
+     */
+    public function i_wait_toast_to_dismiss_in_the_app() {
+        $this->runtime_js('waitToastDismiss()');
     }
 
 }

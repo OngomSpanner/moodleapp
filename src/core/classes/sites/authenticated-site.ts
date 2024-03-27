@@ -72,6 +72,7 @@ export class CoreAuthenticatedSite extends CoreUnauthenticatedSite {
         '4.1': 2022112800,
         '4.2': 2023042400,
         '4.3': 2023100900,
+        '4.4': 2024012500, // @TODO correct the final release date.
     };
 
     // Possible cache update frequencies.
@@ -668,9 +669,9 @@ export class CoreAuthenticatedSite extends CoreUnauthenticatedSite {
             } else if (error.errorcode === 'sitepolicynotagreed') {
                 // Site policy not agreed, trigger event.
                 this.triggerSiteEvent(CoreEvents.SITE_POLICY_NOT_AGREED, {});
-                error.message = Translate.instant('core.login.sitepolicynotagreederror');
+                error.message = Translate.instant('core.policy.sitepolicynotagreederror');
 
-                throw new CoreWSError(error);
+                throw new CoreSilentError(error);
             } else if (error.errorcode === 'dmlwriteexception' && CoreTextUtils.hasUnicodeData(data)) {
                 if (!this.cleanUnicode) {
                     // Try again cleaning unicode.
@@ -942,8 +943,10 @@ export class CoreAuthenticatedSite extends CoreUnauthenticatedSite {
                 throw new CoreSiteError({
                     supportConfig: new CoreUserAuthenticatedSupportConfig(this),
                     message: Translate.instant('core.siteunavailablehelp', { site: this.siteUrl }),
-                    errorcode: 'invalidresponse',
-                    errorDetails: Translate.instant('core.errorinvalidresponse', { method: 'tool_mobile_call_external_functions' }),
+                    debug: {
+                        code: 'invalidresponse',
+                        details: Translate.instant('core.errorinvalidresponse', { method: 'tool_mobile_call_external_functions' }),
+                    },
                 });
             }
 
@@ -1430,7 +1433,7 @@ export class CoreAuthenticatedSite extends CoreUnauthenticatedSite {
                     }
                 }
             }
-        } else if (typeof versions == 'string') {
+        } else if (typeof versions === 'string') {
             // Compare with this version.
             return siteVersion >= this.getVersionNumber(versions);
         }

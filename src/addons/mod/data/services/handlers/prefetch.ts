@@ -26,6 +26,7 @@ import { CoreWSFile } from '@services/ws';
 import { makeSingleton } from '@singletons';
 import { AddonModDataProvider, AddonModDataEntry, AddonModData, AddonModDataData } from '../data';
 import { AddonModDataSync, AddonModDataSyncResult } from '../data-sync';
+import { ContextLevel } from '@/core/constants';
 
 /**
  * Handler to prefetch databases.
@@ -230,7 +231,7 @@ export class AddonModDataPrefetchHandlerService extends CoreCourseActivityPrefet
         // Prefetch the database data.
         const database = info.database;
 
-        const commentsEnabled = !CoreComments.areCommentsDisabledInSite();
+        const commentsEnabled = CoreComments.areCommentsEnabledInSite();
 
         const promises: Promise<unknown>[] = [];
 
@@ -249,7 +250,7 @@ export class AddonModDataPrefetchHandlerService extends CoreCourseActivityPrefet
 
             if (commentsEnabled && database.comments) {
                 promises.push(CoreComments.getComments(
-                    'module',
+                    ContextLevel.MODULE,
                     database.coursemodule,
                     'mod_data',
                     entry.id,

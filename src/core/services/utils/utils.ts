@@ -749,16 +749,17 @@ export class CoreUtilsProvider {
     async getMimeTypeFromUrl(url: string): Promise<string> {
         // First check if it can be guessed from the URL.
         const extension = CoreMimetypeUtils.guessExtensionFromUrl(url);
-        let mimetype = extension && CoreMimetypeUtils.getMimeType(extension);
+        const mimetype = extension && CoreMimetypeUtils.getMimeType(extension);
 
-        if (mimetype) {
+        // Ignore PHP extension for now, it could be serving a file.
+        if (mimetype && extension !== 'php') {
             return mimetype;
         }
 
         // Can't be guessed, get the remote mimetype.
-        mimetype = await CoreWS.getRemoteFileMimeType(url);
+        const remoteMimetype = await CoreWS.getRemoteFileMimeType(url);
 
-        return mimetype || '';
+        return remoteMimetype || mimetype || '';
     }
 
     /**
@@ -1230,6 +1231,8 @@ export class CoreUtilsProvider {
                     type: CoreAnalyticsEventType.OPEN_LINK,
                     link: CoreUrlUtils.unfixPluginfileURL(url),
                 });
+
+                return;
             } catch (error) {
                 this.logger.error('Error opening online file ' + url + ' with mimetype ' + mimetype);
                 this.logger.error('Error: ', JSON.stringify(error));
@@ -1824,23 +1827,29 @@ export class CoreUtilsProvider {
      * @param condition Condition.
      * @returns Cancellable promise.
      */
-    waitFor(condition: () => boolean, interval: number = 50): CoreCancellablePromise<void> {
+    waitFor(condition: () => boolean): CoreCancellablePromise<void>;
+    waitFor(condition: () => boolean, options: CoreUtilsWaitOptions): CoreCancellablePromise<void>;
+    waitFor(condition: () => boolean, interval: number): CoreCancellablePromise<void>;
+    waitFor(condition: () => boolean, optionsOrInterval: CoreUtilsWaitOptions | number = {}): CoreCancellablePromise<void> {
+        const options = typeof optionsOrInterval === 'number' ? { interval: optionsOrInterval } : optionsOrInterval;
+
         if (condition()) {
             return CoreCancellablePromise.resolve();
         }
 
+        const startTime = Date.now();
         let intervalId: number | undefined;
 
         return new CoreCancellablePromise<void>(
             async (resolve) => {
                 intervalId = window.setInterval(() => {
-                    if (!condition()) {
+                    if (!condition() && (!options.timeout || (Date.now() - startTime < options.timeout))) {
                         return;
                     }
 
                     resolve();
                     window.clearInterval(intervalId);
-                }, interval);
+                }, options.interval ?? 50);
             },
             () => window.clearInterval(intervalId),
         );
@@ -1935,6 +1944,14 @@ export type CoreUtilsOpenInBrowserOptions = {
  */
 export type CoreUtilsOpenInAppOptions = InAppBrowserOptions & {
     originalUrl?: string; // Original URL to open (in case the URL was treated, e.g. to add a token or an auto-login).
+};
+
+/**
+ * Options for waiting.
+ */
+export type CoreUtilsWaitOptions = {
+    interval?: number;
+    timeout?: number;
 };
 
 /**

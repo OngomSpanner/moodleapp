@@ -31,12 +31,10 @@ export class CoreSortedDelegate<
     protected sortedHandlers: DisplayType[] = [];
 
     /**
-     * Constructor of the Delegate.
-     *
-     * @param delegateName Delegate name used for logging purposes.
+     * @inheritdoc
      */
     constructor(delegateName: string) {
-        super(delegateName, true);
+        super(delegateName);
 
         CoreEvents.on(CoreEvents.LOGOUT, () => this.clearSortedHandlers());
         CoreEvents.on(CoreEvents.SITE_POLICY_AGREED, (data) => {

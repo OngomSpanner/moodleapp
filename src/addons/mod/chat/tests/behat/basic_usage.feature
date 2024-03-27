@@ -1,4 +1,4 @@
-@mod @mod_chat @app @javascript
+@addon_mod_chat @app @javascript
 Feature: Test basic usage of chat in app
   As a student
   I need basic chat functionality to work
@@ -15,6 +15,7 @@ Feature: Test basic usage of chat in app
       | user     | course | role           |
       | student1 | C1     | student        |
       | student2 | C1     | student        |
+    And I enable "chat" "mod" plugin
     And the following "activities" exist:
       | activity   | name            | intro       | course | idnumber | groupmode |
       | chat       | Test chat name  | Test chat   | C1     | chat     | 0         |
@@ -76,3 +77,10 @@ Feature: Test basic usage of chat in app
     And I press "david student" near "(2)" in the app
     Then I should find "Hi!" in the app
     And I should find "I am David" in the app
+
+  Scenario: Prefetch chat
+    # Only check that the chat is marked as downloaded to test that lazy handler is working.
+    Given I entered the course "Course 1" as "student1" in the app
+    When I press "Course downloads" in the app
+    And I press "Download" within "Test chat name" "ion-item" in the app
+    Then I should not be able to press "Download" within "Test chat name" "ion-item" in the app

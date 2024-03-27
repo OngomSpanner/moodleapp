@@ -15,7 +15,8 @@
         <ion-list>
             <ion-item button class="ion-text-wrap {{question.stateClass}}" *ngFor="let question of navigation"
                 [attr.aria-current]="!summaryShown && currentPage === question.page ? 'page' : 'false'"
-                (click)="loadPage(question.page, question.slot)" [detail]="false">
+                [disabled]="!isReview && isSequential && currentPage !== question.page" (click)="loadPage(question.page, question.slot)"
+                [detail]="false">
 
                 <ion-label class="ion-text-wrap">
                     <span *ngIf="question.type !== 'description' && question.questionnumber">
@@ -43,7 +44,7 @@
 </ion-content>
 <ion-footer *ngIf="!isReview">
     <!-- In player, show button to finish attempt. -->
-    <ion-button class="ion-text-wrap ion-margin" expand="block" (click)="loadPage(-1)">
+    <ion-button class="ion-text-wrap ion-margin" expand="block" (click)="loadPage(-1)" [disabled]="isSequential && nextPage !== -1">
         {{ 'addon.mod_quiz.finishattemptdots' | translate }}
     </ion-button>
 </ion-footer>

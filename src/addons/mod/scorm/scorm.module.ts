@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { APP_INITIALIZER, NgModule, Type } from '@angular/core';
+import { APP_INITIALIZER, NgModule } from '@angular/core';
 import { Routes } from '@angular/router';
 import { CoreContentLinksDelegate } from '@features/contentlinks/services/contentlinks-delegate';
 import { CoreCourseHelper } from '@features/course/services/course-helper';
@@ -22,7 +22,6 @@ import { CoreMainMenuTabRoutingModule } from '@features/mainmenu/mainmenu-tab-ro
 import { CoreCronDelegate } from '@services/cron';
 import { CorePluginFileDelegate } from '@services/plugin-file-delegate';
 import { CORE_SITE_SCHEMAS } from '@services/sites';
-import { AddonModScormComponentsModule } from './components/components.module';
 import { OFFLINE_SITE_SCHEMA } from './services/database/scorm';
 import { AddonModScormGradeLinkHandler } from './services/handlers/grade-link';
 import { AddonModScormIndexLinkHandler } from './services/handlers/index-link';
@@ -33,16 +32,6 @@ import { AddonModScormPluginFileHandler } from './services/handlers/pluginfile';
 import { AddonModScormPrefetchHandler } from './services/handlers/prefetch';
 import { AddonModScormSyncCronHandler } from './services/handlers/sync-cron';
 import { AddonModScormProvider } from './services/scorm';
-import { AddonModScormHelperProvider } from './services/scorm-helper';
-import { AddonModScormOfflineProvider } from './services/scorm-offline';
-import { AddonModScormSyncProvider } from './services/scorm-sync';
-
-export const ADDON_MOD_SCORM_SERVICES: Type<unknown>[] = [
-    AddonModScormProvider,
-    AddonModScormOfflineProvider,
-    AddonModScormHelperProvider,
-    AddonModScormSyncProvider,
-];
 
 const routes: Routes = [
     {
@@ -54,7 +43,6 @@ const routes: Routes = [
 @NgModule({
     imports: [
         CoreMainMenuTabRoutingModule.forChild(routes),
-        AddonModScormComponentsModule,
     ],
     providers: [
         {

@@ -1,4 +1,4 @@
-@mod @mod_survey @app @javascript
+@addon_mod_survey @app @javascript
 Feature: Test basic usage of survey activity in app
   In order to participate in surveys while using the mobile app
   As a student
@@ -16,6 +16,7 @@ Feature: Test basic usage of survey activity in app
       | user     | course | role    |
       | student1 | C1     | student |
       | teacher1 | C1     | editingteacher |
+    And I enable "survey" "mod" plugin
     And the following "activities" exist:
       | activity | name             | intro       | course | idnumber | groupmode |
       | survey   | Test survey name | Test survey | C1     | survey   | 0         |

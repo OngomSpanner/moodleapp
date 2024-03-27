@@ -28,9 +28,8 @@ import { CoreTextUtils } from '@services/utils/text';
 import { CoreTimeUtils } from '@services/utils/time';
 import { CoreUrlUtils } from '@services/utils/url';
 import { CoreUtils, CoreUtilsOpenFileOptions } from '@services/utils/utils';
-import { SQLiteDB } from '@classes/sqlitedb';
 import { CoreError } from '@classes/errors/error';
-import { CoreConstants } from '@/core/constants';
+import { DownloadStatus, TDownloadStatus } from '@/core/constants';
 import { ApplicationInit, makeSingleton, NgZone, Translate } from '@singletons';
 import { CoreLogger } from '@singletons/logger';
 import {
@@ -42,10 +41,14 @@ import {
     CoreFilepoolFileEntry,
     CoreFilepoolComponentLink,
     CoreFilepoolFileOptions,
-    CoreFilepoolLinksRecord,
+    CoreFilepoolLinksDBRecord,
     CoreFilepoolPackageEntry,
     CoreFilepoolQueueEntry,
-    CoreFilepoolQueueDBEntry,
+    CoreFilepoolQueueDBRecord,
+    CoreFilepoolLinksDBPrimaryKeys,
+    LINKS_TABLE_PRIMARY_KEYS,
+    CoreFilepoolQueueDBPrimaryKeys,
+    QUEUE_TABLE_PRIMARY_KEYS,
 } from '@services/database/filepool';
 import { CoreFileHelper } from './file-helper';
 import { CoreUrl } from '@singletons/url';
@@ -102,38 +105,44 @@ export class CoreFilepoolProvider {
     // Variables to prevent downloading packages/files twice at the same time.
     protected packagesPromises: { [s: string]: { [s: string]: Promise<void> } } = {};
     protected filePromises: { [s: string]: { [s: string]: Promise<string> } } = {};
-    protected filesTables: LazyMap<AsyncInstance<CoreDatabaseTable<CoreFilepoolFileEntry, 'fileId'>>>;
-    protected linksTables:
-        LazyMap<AsyncInstance<CoreDatabaseTable<CoreFilepoolLinksRecord, 'fileId' | 'component' | 'componentId'>>>;
+    protected filesTables: LazyMap<AsyncInstance<CoreDatabaseTable<CoreFilepoolFileEntry, 'fileId', never>>>;
+    protected linksTables: LazyMap<
+        AsyncInstance<CoreDatabaseTable<CoreFilepoolLinksDBRecord, CoreFilepoolLinksDBPrimaryKeys, never>>
+    >;
 
     protected packagesTables: LazyMap<AsyncInstance<CoreDatabaseTable<CoreFilepoolPackageEntry>>>;
-    protected queueTable = asyncInstance<CoreDatabaseTable<CoreFilepoolQueueDBEntry, 'siteId' | 'fileId'>>();
+    protected queueTable = asyncInstance<CoreDatabaseTable<CoreFilepoolQueueDBRecord, CoreFilepoolQueueDBPrimaryKeys>>();
 
     constructor() {
         this.logger = CoreLogger.getInstance('CoreFilepoolProvider');
         this.filesTables = lazyMap(
             siteId => asyncInstance(
-                () => CoreSites.getSiteTable<CoreFilepoolFileEntry, 'fileId'>(FILES_TABLE_NAME, {
+                () => CoreSites.getSiteTable<CoreFilepoolFileEntry, 'fileId', never>(FILES_TABLE_NAME, {
                     siteId,
                     config: { cachingStrategy: CoreDatabaseCachingStrategy.Lazy },
                     primaryKeyColumns: ['fileId'],
+                    rowIdColumn: null,
                     onDestroy: () => delete this.filesTables[siteId],
                 }),
             ),
         );
         this.linksTables = lazyMap(
             siteId => asyncInstance(
-                () => CoreSites.getSiteTable<CoreFilepoolLinksRecord, 'fileId' | 'component' | 'componentId'>(LINKS_TABLE_NAME, {
-                    siteId,
-                    config: { cachingStrategy: CoreDatabaseCachingStrategy.Lazy },
-                    primaryKeyColumns: ['fileId', 'component', 'componentId'],
-                    onDestroy: () => delete this.linksTables[siteId],
-                }),
+                () => CoreSites.getSiteTable<CoreFilepoolLinksDBRecord, CoreFilepoolLinksDBPrimaryKeys, never>(
+                    LINKS_TABLE_NAME,
+                    {
+                        siteId,
+                        config: { cachingStrategy: CoreDatabaseCachingStrategy.Lazy },
+                        primaryKeyColumns: [...LINKS_TABLE_PRIMARY_KEYS],
+                        rowIdColumn: null,
+                        onDestroy: () => delete this.linksTables[siteId],
+                    },
+                ),
             ),
         );
         this.packagesTables = lazyMap(
             siteId => asyncInstance(
-                () => CoreSites.getSiteTable<CoreFilepoolPackageEntry, 'id'>(PACKAGES_TABLE_NAME, {
+                () => CoreSites.getSiteTable(PACKAGES_TABLE_NAME, {
                     siteId,
                     config: { cachingStrategy: CoreDatabaseCachingStrategy.Lazy },
                     onDestroy: () => delete this.packagesTables[siteId],
@@ -168,11 +177,11 @@ export class CoreFilepoolProvider {
             // Ignore errors.
         }
 
-        const queueTable = new CoreDatabaseTableProxy<CoreFilepoolQueueDBEntry, 'siteId' | 'fileId'>(
+        const queueTable = new CoreDatabaseTableProxy<CoreFilepoolQueueDBRecord, CoreFilepoolQueueDBPrimaryKeys>(
             { cachingStrategy: CoreDatabaseCachingStrategy.Lazy },
             CoreApp.getDB(),
             QUEUE_TABLE_NAME,
-            ['siteId','fileId'],
+            [...QUEUE_TABLE_PRIMARY_KEYS],
         );
 
         await queueTable.initialize();
@@ -406,7 +415,7 @@ export class CoreFilepoolProvider {
             return this.addToQueue(siteId, fileId, fileUrl, priority, revision, timemodified, filePath, onProgress, options, link);
         }
 
-        const newData: Partial<CoreFilepoolQueueDBEntry> = {};
+        const newData: Partial<CoreFilepoolQueueDBRecord> = {};
         let foundLink = false;
 
         // We already have the file in queue, we update the priority and links.
@@ -584,7 +593,12 @@ export class CoreFilepoolProvider {
             }
 
             // Trigger module status changed, setting it as not downloaded.
-            this.triggerPackageStatusChanged(siteId, CoreConstants.NOT_DOWNLOADED, entry.component, entry.componentId);
+            this.triggerPackageStatusChanged(
+                siteId,
+                DownloadStatus.DOWNLOADABLE_NOT_DOWNLOADED,
+                entry.component,
+                entry.componentId,
+            );
         });
     }
 
@@ -660,36 +674,36 @@ export class CoreFilepoolProvider {
     /**
      * Given the current status of a list of packages and the status of one of the packages,
      * determine the new status for the list of packages. The status of a list of packages is:
-     *     - CoreConstants.NOT_DOWNLOADABLE if there are no downloadable packages.
-     *     - CoreConstants.NOT_DOWNLOADED if at least 1 package has status CoreConstants.NOT_DOWNLOADED.
-     *     - CoreConstants.DOWNLOADED if ALL the downloadable packages have status CoreConstants.DOWNLOADED.
-     *     - CoreConstants.DOWNLOADING if ALL the downloadable packages have status CoreConstants.DOWNLOADING or
-     *                                     CoreConstants.DOWNLOADED, with at least 1 package with CoreConstants.DOWNLOADING.
-     *     - CoreConstants.OUTDATED if ALL the downloadable packages have status CoreConstants.OUTDATED or CoreConstants.DOWNLOADED
-     *                                     or CoreConstants.DOWNLOADING, with at least 1 package with CoreConstants.OUTDATED.
+     *     - NOT_DOWNLOADABLE if there are no downloadable packages.
+     *     - DOWNLOADABLE_NOT_DOWNLOADED if at least 1 package has status DOWNLOADABLE_NOT_DOWNLOADED.
+     *     - DOWNLOADED if ALL the downloadable packages have status DOWNLOADED.
+     *     - DOWNLOADING if ALL the downloadable packages have status DOWNLOADING or DOWNLOADED, with at least 1 package
+     *                                     with status DOWNLOADING.
+     *     - OUTDATED if ALL the downloadable packages have status OUTDATED or DOWNLOADED or DOWNLOADING, with at least 1 package
+     *                                     with OUTDATED.
      *
      * @param current Current status of the list of packages.
      * @param packageStatus Status of one of the packages.
      * @returns New status for the list of packages;
      */
-    determinePackagesStatus(current: string, packageStatus: string): string {
+    determinePackagesStatus(current: TDownloadStatus, packageStatus: TDownloadStatus): TDownloadStatus {
         if (!current) {
-            current = CoreConstants.NOT_DOWNLOADABLE;
+            current = DownloadStatus.NOT_DOWNLOADABLE;
         }
 
-        if (packageStatus === CoreConstants.NOT_DOWNLOADED) {
+        if (packageStatus === DownloadStatus.DOWNLOADABLE_NOT_DOWNLOADED) {
             // If 1 package is not downloaded the status of the whole list will always be not downloaded.
-            return CoreConstants.NOT_DOWNLOADED;
-        } else if (packageStatus === CoreConstants.DOWNLOADED && current === CoreConstants.NOT_DOWNLOADABLE) {
+            return DownloadStatus.DOWNLOADABLE_NOT_DOWNLOADED;
+        } else if (packageStatus === DownloadStatus.DOWNLOADED && current === DownloadStatus.NOT_DOWNLOADABLE) {
             // If all packages are downloaded or not downloadable with at least 1 downloaded, status will be downloaded.
-            return CoreConstants.DOWNLOADED;
-        } else if (packageStatus === CoreConstants.DOWNLOADING &&
-            (current === CoreConstants.NOT_DOWNLOADABLE || current === CoreConstants.DOWNLOADED)) {
+            return DownloadStatus.DOWNLOADED;
+        } else if (packageStatus === DownloadStatus.DOWNLOADING &&
+            (current === DownloadStatus.NOT_DOWNLOADABLE || current === DownloadStatus.DOWNLOADED)) {
             // If all packages are downloading/downloaded/notdownloadable with at least 1 downloading, status will be downloading.
-            return CoreConstants.DOWNLOADING;
-        } else if (packageStatus === CoreConstants.OUTDATED && current !== CoreConstants.NOT_DOWNLOADED) {
+            return DownloadStatus.DOWNLOADING;
+        } else if (packageStatus === DownloadStatus.OUTDATED && current !== DownloadStatus.DOWNLOADABLE_NOT_DOWNLOADED) {
             // If there are no packages notdownloaded and there is at least 1 outdated, status will be outdated.
-            return CoreConstants.OUTDATED;
+            return DownloadStatus.OUTDATED;
         }
 
         // Status remains the same.
@@ -771,7 +785,7 @@ export class CoreFilepoolProvider {
             });
 
             // Add the anchor again to the local URL.
-            return fileEntry.toURL() + (anchor || '');
+            return CoreFile.getFileEntryURL(fileEntry) + (anchor || '');
         }).finally(() => {
             // Download finished, delete the promise.
             delete this.filePromises[siteId][downloadId];
@@ -877,7 +891,7 @@ export class CoreFilepoolProvider {
         }
 
         // Set package as downloading.
-        const promise = this.storePackageStatus(siteId, CoreConstants.DOWNLOADING, component, componentId).then(async () => {
+        const promise = this.storePackageStatus(siteId, DownloadStatus.DOWNLOADING, component, componentId).then(async () => {
             const promises: Promise<string | void>[] = [];
             let packageLoaded = 0;
 
@@ -950,7 +964,7 @@ export class CoreFilepoolProvider {
             try {
                 await Promise.all(promises);
                 // Success prefetching, store package as downloaded.
-                await this.storePackageStatus(siteId, CoreConstants.DOWNLOADED, component, componentId, extra);
+                await this.storePackageStatus(siteId, DownloadStatus.DOWNLOADED, component, componentId, extra);
 
                 return;
             } catch (error) {
@@ -1245,7 +1259,7 @@ export class CoreFilepoolProvider {
         siteId: string | undefined,
         component: string,
         componentId?: string | number,
-    ): Promise<CoreFilepoolLinksRecord[]> {
+    ): Promise<CoreFilepoolLinksDBRecord[]> {
         siteId = siteId ?? CoreSites.getCurrentSiteId();
         const conditions = {
             component,
@@ -1278,7 +1292,7 @@ export class CoreFilepoolProvider {
         const filePath = await this.getFilePath(siteId, fileId, '');
         const dirEntry = await CoreFile.getDir(filePath);
 
-        return dirEntry.toURL();
+        return CoreFile.getFileEntryURL(dirEntry);
     }
 
     /**
@@ -1364,7 +1378,7 @@ export class CoreFilepoolProvider {
      * @param fileId The file ID.
      * @returns Promise resolved with the links.
      */
-    protected async getFileLinks(siteId: string, fileId: string): Promise<CoreFilepoolLinksRecord[]> {
+    protected async getFileLinks(siteId: string, fileId: string): Promise<CoreFilepoolLinksDBRecord[]> {
         const items = await this.linksTables[siteId].getMany({ fileId });
 
         items.forEach((item) => {
@@ -1511,13 +1525,13 @@ export class CoreFilepoolProvider {
         timemodified: number = 0,
         filePath?: string,
         revision?: number,
-    ): Promise<string> {
+    ): Promise<TDownloadStatus> {
         let file: CoreWSFile;
 
         try {
             file = await this.fixPluginfileURL(siteId, fileUrl, timemodified);
         } catch (e) {
-            return CoreConstants.NOT_DOWNLOADABLE;
+            return DownloadStatus.NOT_DOWNLOADABLE;
         }
 
         fileUrl = CoreUrl.removeUrlAnchor(CoreFileHelper.getFileUrl(file));
@@ -1529,7 +1543,7 @@ export class CoreFilepoolProvider {
             // Check if the file is in queue (waiting to be downloaded).
             await this.hasFileInQueue(siteId, fileId);
 
-            return CoreConstants.DOWNLOADING;
+            return DownloadStatus.DOWNLOADING;
         } catch (e) {
             // Check if the file is being downloaded right now.
             const extension = CoreMimetypeUtils.guessExtensionFromUrl(fileUrl);
@@ -1538,7 +1552,7 @@ export class CoreFilepoolProvider {
             const downloadId = this.getFileDownloadId(fileUrl, filePath);
 
             if (this.filePromises[siteId] && this.filePromises[siteId][downloadId] !== undefined) {
-                return CoreConstants.DOWNLOADING;
+                return DownloadStatus.DOWNLOADING;
             }
 
             try {
@@ -1546,12 +1560,12 @@ export class CoreFilepoolProvider {
                 const entry = await this.hasFileInPool(siteId, fileId);
 
                 if (this.isFileOutdated(entry, revision, timemodified)) {
-                    return CoreConstants.OUTDATED;
+                    return DownloadStatus.OUTDATED;
                 }
 
-                return CoreConstants.DOWNLOADED;
+                return DownloadStatus.DOWNLOADED;
             } catch (e) {
-                return CoreConstants.NOT_DOWNLOADED;
+                return DownloadStatus.DOWNLOADABLE_NOT_DOWNLOADED;
             }
         }
     }
@@ -1666,7 +1680,7 @@ export class CoreFilepoolProvider {
         const path = await this.getFilePath(siteId, fileId);
         const fileEntry = await CoreFile.getFile(path);
 
-        return CoreFile.convertFileSrc(fileEntry.toURL());
+        return CoreFile.convertFileSrc(CoreFile.getFileEntryURL(fileEntry));
     }
 
     /**
@@ -1685,7 +1699,7 @@ export class CoreFilepoolProvider {
         const fileEntry = await CoreFile.getFile(path);
 
         // This URL is usually used to launch files or put them in HTML.
-        return fileEntry.toURL();
+        return CoreFile.getFileEntryURL(fileEntry);
     }
 
     /**
@@ -1701,7 +1715,25 @@ export class CoreFilepoolProvider {
 
         const fileEntry = await CoreFile.getFile(filePath);
 
-        return fileEntry.toURL();
+        return CoreFile.getFileEntryURL(fileEntry);
+    }
+
+    /**
+     * Returns the local src of a file.
+     *
+     * @param siteId The site ID.
+     * @param fileUrl The file URL.
+     * @returns Src URL.
+     */
+    async getInternalSrcByUrl(siteId: string, fileUrl: string): Promise<string> {
+        if (!CoreFile.isAvailable()) {
+            throw new CoreError('File system cannot be used.');
+        }
+
+        const file = await this.fixPluginfileURL(siteId, fileUrl);
+        const fileId = this.getFileIdByUrl(CoreFileHelper.getFileUrl(file));
+
+        return this.getInternalSrcById(siteId, fileId);
     }
 
     /**
@@ -1797,7 +1829,7 @@ export class CoreFilepoolProvider {
         const dirPath = await this.getFilePath(siteId, dirName, '');
         const dirEntry = await CoreFile.getDir(dirPath);
 
-        return dirEntry.toURL();
+        return CoreFile.getFileEntryURL(dirEntry);
     }
 
     /**
@@ -1846,13 +1878,13 @@ export class CoreFilepoolProvider {
      * @param componentId An ID to use in conjunction with the component.
      * @returns Promise resolved with the status.
      */
-    async getPackagePreviousStatus(siteId: string, component: string, componentId?: string | number): Promise<string> {
+    async getPackagePreviousStatus(siteId: string, component: string, componentId?: string | number): Promise<TDownloadStatus> {
         try {
             const entry = await this.getPackageData(siteId, component, componentId);
 
-            return entry.previous || CoreConstants.NOT_DOWNLOADED;
+            return entry.previous || DownloadStatus.DOWNLOADABLE_NOT_DOWNLOADED;
         } catch (error) {
-            return CoreConstants.NOT_DOWNLOADED;
+            return DownloadStatus.DOWNLOADABLE_NOT_DOWNLOADED;
         }
     }
 
@@ -1864,13 +1896,13 @@ export class CoreFilepoolProvider {
      * @param componentId An ID to use in conjunction with the component.
      * @returns Promise resolved with the status.
      */
-    async getPackageStatus(siteId: string, component: string, componentId?: string | number): Promise<string> {
+    async getPackageStatus(siteId: string, component: string, componentId?: string | number): Promise<TDownloadStatus> {
         try {
             const entry = await this.getPackageData(siteId, component, componentId);
 
-            return entry.status || CoreConstants.NOT_DOWNLOADED;
+            return entry.status || DownloadStatus.DOWNLOADABLE_NOT_DOWNLOADED;
         } catch (error) {
-            return CoreConstants.NOT_DOWNLOADED;
+            return DownloadStatus.DOWNLOADABLE_NOT_DOWNLOADED;
         }
     }
 
@@ -2260,6 +2292,8 @@ export class CoreFilepoolProvider {
         componentId?: string | number,
         onlyUnknown: boolean = true,
     ): Promise<void> {
+        siteId = siteId ?? CoreSites.getCurrentSiteId();
+
         const items = await this.getComponentFiles(siteId, component, componentId);
 
         if (!items.length) {
@@ -2267,23 +2301,15 @@ export class CoreFilepoolProvider {
             return;
         }
 
-        siteId = siteId ?? CoreSites.getCurrentSiteId();
-
         const fileIds = items.map((item) => item.fileId);
-
-        const whereAndParams = SQLiteDB.getInOrEqual(fileIds);
-
-        whereAndParams.sql = 'fileId ' + whereAndParams.sql;
-
-        if (onlyUnknown) {
-            whereAndParams.sql += ' AND (' + CoreFilepoolProvider.FILE_IS_UNKNOWN_SQL + ')';
-        }
 
         await this.filesTables[siteId].updateWhere(
             { stale: 1 },
             {
-                sql: whereAndParams.sql,
-                sqlParams: whereAndParams.params,
+                sql: onlyUnknown
+                    ? `fileId IN (${fileIds.map(() => '?').join(', ')}) AND (${CoreFilepoolProvider.FILE_IS_UNKNOWN_SQL})`
+                    : `fileId IN (${fileIds.map(() => '?').join(', ')})`,
+                sqlParams: fileIds,
                 js: record => fileIds.includes(record.fileId) && (
                     !onlyUnknown || CoreFilepoolProvider.FILE_IS_UNKNOWN_JS(record)
                 ),
@@ -2321,7 +2347,7 @@ export class CoreFilepoolProvider {
     ): Promise<boolean> {
         const state = await this.getFileStateByUrl(siteId, fileUrl, timemodified, filePath, revision);
 
-        return state != CoreConstants.NOT_DOWNLOADABLE;
+        return state !== DownloadStatus.NOT_DOWNLOADABLE;
     }
 
     /**
@@ -2804,7 +2830,7 @@ export class CoreFilepoolProvider {
      * @param componentId An ID to use in conjunction with the component.
      * @returns Promise resolved when the status is changed. Resolve param: new status.
      */
-    async setPackagePreviousStatus(siteId: string, component: string, componentId?: string | number): Promise<string> {
+    async setPackagePreviousStatus(siteId: string, component: string, componentId?: string | number): Promise<TDownloadStatus> {
         componentId = this.fixComponentId(componentId);
         this.logger.debug(`Set previous status for package ${component} ${componentId}`);
 
@@ -2813,11 +2839,11 @@ export class CoreFilepoolProvider {
         // Get current stored data, we'll only update 'status' and 'updated' fields.
         const entry = await this.packagesTables[siteId].getOneByPrimaryKey({ id: packageId });
         const newData: CoreFilepoolPackageEntry = {};
-        if (entry.status == CoreConstants.DOWNLOADING) {
+        if (entry.status === DownloadStatus.DOWNLOADING) {
             // Going back from downloading to previous status, restore previous download time.
             newData.downloadTime = entry.previousDownloadTime;
         }
-        newData.status = entry.previous || CoreConstants.NOT_DOWNLOADED;
+        newData.status = entry.previous || DownloadStatus.DOWNLOADABLE_NOT_DOWNLOADED;
         newData.updated = Date.now();
         this.logger.debug(`Set previous status '${entry.status}' for package ${component} ${componentId}`);
 
@@ -2883,7 +2909,7 @@ export class CoreFilepoolProvider {
      */
     async storePackageStatus(
         siteId: string,
-        status: string,
+        status: TDownloadStatus,
         component: string,
         componentId?: string | number,
         extra?: string,
@@ -2895,12 +2921,12 @@ export class CoreFilepoolProvider {
         let downloadTime: number | undefined;
         let previousDownloadTime: number | undefined;
 
-        if (status == CoreConstants.DOWNLOADING) {
+        if (status === DownloadStatus.DOWNLOADING) {
             // Set download time if package is now downloading.
             downloadTime = CoreTimeUtils.timestamp();
         }
 
-        let previousStatus: string | undefined;
+        let previousStatus: TDownloadStatus | undefined;
         // Search current status to set it as previous status.
         try {
             const entry = await this.packagesTables[siteId].getOneByPrimaryKey({ id: packageId });
@@ -3047,7 +3073,12 @@ export class CoreFilepoolProvider {
      * @param component Package's component.
      * @param componentId An ID to use in conjunction with the component.
      */
-    protected triggerPackageStatusChanged(siteId: string, status: string, component: string, componentId?: string | number): void {
+    protected triggerPackageStatusChanged(
+        siteId: string,
+        status: TDownloadStatus,
+        component: string,
+        componentId?: string | number,
+    ): void {
         const data: CoreEventPackageStatusChanged = {
             component,
             componentId: this.fixComponentId(componentId),
@@ -3065,7 +3096,6 @@ export class CoreFilepoolProvider {
      * @param siteId Site ID.
      * @param component Package's component.
      * @param componentId An ID to use in conjunction with the component.
-     * @returns Promise resolved when status is stored.
      */
     async updatePackageDownloadTime(siteId: string, component: string, componentId?: string | number): Promise<void> {
         componentId = this.fixComponentId(componentId);

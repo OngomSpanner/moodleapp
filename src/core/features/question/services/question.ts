@@ -28,6 +28,15 @@ import {
     QUESTION_ANSWERS_TABLE_NAME,
     QUESTION_TABLE_NAME,
 } from './database/question';
+import {
+    QUESTION_COMPLETE_STATE_CLASSES,
+    QUESTION_FINISHED_STATE_CLASSES,
+    QUESTION_GAVE_UP_STATE_CLASSES,
+    QUESTION_GRADED_STATE_CLASSES,
+    QUESTION_INVALID_STATE_CLASSES,
+    QUESTION_NEEDS_GRADING_STATE_CLASSES,
+    QUESTION_TODO_STATE_CLASSES,
+} from '@features/question/constants';
 
 const QUESTION_PREFIX_REGEX = /q\d+:(\d+)_/;
 const STATES: Record<string, CoreQuestionState> = {
@@ -35,6 +44,7 @@ const STATES: Record<string, CoreQuestionState> = {
         name: 'todo',
         class: 'core-question-notyetanswered',
         status: 'notyetanswered',
+        stateclass: 'notyetanswered',
         active: true,
         finished: false,
     },
@@ -42,6 +52,7 @@ const STATES: Record<string, CoreQuestionState> = {
         name: 'invalid',
         class: 'core-question-invalidanswer',
         status: 'invalidanswer',
+        stateclass: 'invalidanswer',
         active: true,
         finished: false,
     },
@@ -49,6 +60,7 @@ const STATES: Record<string, CoreQuestionState> = {
         name: 'complete',
         class: 'core-question-answersaved',
         status: 'answersaved',
+        stateclass: 'answersaved',
         active: true,
         finished: false,
     },
@@ -56,6 +68,7 @@ const STATES: Record<string, CoreQuestionState> = {
         name: 'needsgrading',
         class: 'core-question-requiresgrading',
         status: 'requiresgrading',
+        stateclass: 'requiresgrading',
         active: false,
         finished: true,
     },
@@ -63,6 +76,7 @@ const STATES: Record<string, CoreQuestionState> = {
         name: 'finished',
         class: 'core-question-complete',
         status: 'complete',
+        stateclass: 'complete',
         active: false,
         finished: true,
     },
@@ -70,6 +84,7 @@ const STATES: Record<string, CoreQuestionState> = {
         name: 'gaveup',
         class: 'core-question-notanswered',
         status: 'notanswered',
+        stateclass: 'notanswered',
         active: false,
         finished: true,
     },
@@ -77,6 +92,7 @@ const STATES: Record<string, CoreQuestionState> = {
         name: 'gradedwrong',
         class: 'core-question-incorrect',
         status: 'incorrect',
+        stateclass: 'incorrect',
         active: false,
         finished: true,
     },
@@ -84,6 +100,7 @@ const STATES: Record<string, CoreQuestionState> = {
         name: 'gradedpartial',
         class: 'core-question-partiallycorrect',
         status: 'partiallycorrect',
+        stateclass: 'partiallycorrect',
         active: false,
         finished: true,
     },
@@ -91,6 +108,7 @@ const STATES: Record<string, CoreQuestionState> = {
         name: 'gradedright',
         class: 'core-question-correct',
         status: 'correct',
+        stateclass: 'correct',
         active: false,
         finished: true,
     },
@@ -98,6 +116,7 @@ const STATES: Record<string, CoreQuestionState> = {
         name: 'mangrwrong',
         class: 'core-question-incorrect',
         status: 'incorrect',
+        stateclass: 'incorrect',
         active: false,
         finished: true,
     },
@@ -105,6 +124,7 @@ const STATES: Record<string, CoreQuestionState> = {
         name: 'mangrpartial',
         class: 'core-question-partiallycorrect',
         status: 'partiallycorrect',
+        stateclass: 'partiallycorrect',
         active: false,
         finished: true,
     },
@@ -112,6 +132,7 @@ const STATES: Record<string, CoreQuestionState> = {
         name: 'mangrright',
         class: 'core-question-correct',
         status: 'correct',
+        stateclass: 'correct',
         active: false,
         finished: true,
     },
@@ -119,6 +140,7 @@ const STATES: Record<string, CoreQuestionState> = {
         name: 'cannotdeterminestatus',
         class: 'core-question-unknown',
         status: 'cannotdeterminestatus',
+        stateclass: undefined,
         active: true,
         finished: false,
     },
@@ -574,6 +596,15 @@ export type CoreQuestionState = {
     name: string; // Name of the state.
     class: string; // Class to style the state.
     status: string; // The string key to translate the state.
+    stateclass: // A machine-readable class name for the state that this question attempt is in.
+        typeof QUESTION_TODO_STATE_CLASSES[number] |
+        typeof QUESTION_INVALID_STATE_CLASSES[number] |
+        typeof QUESTION_COMPLETE_STATE_CLASSES[number] |
+        typeof QUESTION_NEEDS_GRADING_STATE_CLASSES[number] |
+        typeof QUESTION_FINISHED_STATE_CLASSES[number] |
+        typeof QUESTION_GAVE_UP_STATE_CLASSES[number] |
+        typeof QUESTION_GRADED_STATE_CLASSES[number] |
+        undefined;
     active: boolean; // Whether the question with this state is active.
     finished: boolean; // Whether the question with this state is finished.
 };
@@ -598,6 +629,14 @@ export type CoreQuestionQuestionWSData = {
     questionnumber?: string; // @since 4.2. Question ordering number in the quiz.
     state?: string; // The state where the question is in. It won't be returned if the user cannot see it.
     status?: string; // Current formatted state of the question.
+    stateclass?: // @since 4.4. A machine-readable class name for the state that this question attempt is in.
+        typeof QUESTION_TODO_STATE_CLASSES[number] |
+        typeof QUESTION_INVALID_STATE_CLASSES[number] |
+        typeof QUESTION_COMPLETE_STATE_CLASSES[number] |
+        typeof QUESTION_NEEDS_GRADING_STATE_CLASSES[number] |
+        typeof QUESTION_FINISHED_STATE_CLASSES[number] |
+        typeof QUESTION_GAVE_UP_STATE_CLASSES[number] |
+        typeof QUESTION_GRADED_STATE_CLASSES[number];
     blockedbyprevious?: boolean; // Whether the question is blocked by the previous question.
     mark?: string; // The mark awarded. It will be returned only if the user is allowed to see it.
     maxmark?: number; // The maximum mark possible for this question attempt.

@@ -31,7 +31,7 @@
         <ion-list *ngIf="event">
             <ion-item class="ion-text-wrap addon-calendar-event" collapsible [ngClass]="['addon-calendar-eventtype-'+event.eventtype]">
                 <core-mod-icon *ngIf="event.moduleIcon" [modicon]="event.moduleIcon" [showAlt]="false" [modname]="event.modulename"
-                    [componentId]="event.instance" slot="start" [purpose]="event.purpose" />
+                    [componentId]="event.instance" slot="start" [purpose]="event.purpose" [isBranded]="event.branded" />
                 <ion-icon *ngIf=" event.eventIcon && !event.moduleIcon" [name]="event.eventIcon" aria-hidden="true" slot="start" />
                 <ion-label>
                     <!-- Add the icon title so accessibility tools read it. -->
@@ -119,6 +119,23 @@
                 </ion-label>
             </ion-item>
         </ion-list>
+
+        <ion-card class="core-warning-card core-card-with-buttons"
+            *ngIf="remindersEnabled && event && !canScheduleExactAlarms && !scheduleExactWarningHidden">
+            <ion-item class="ion-text-wrap">
+                <ion-icon name="fas-circle-info" slot="start" aria-hidden="true" />
+                <ion-label>
+                    <p><strong>{{ 'core.exactalarmsturnedoff' | translate }}</strong></p>
+                    <p>{{ 'core.exactalarmsturnedoffmessage' | translate }}</p>
+                </ion-label>
+            </ion-item>
+            <div class="core-card-buttons">
+                <ion-button fill="clear" (click)="hideAlarmWarning()">
+                    {{ 'core.dontshowagain' | translate | coreNoPeriod }}
+                </ion-button>
+                <ion-button fill="outline" (click)="openAlarmSettings()">{{ 'core.turnon' | translate }}</ion-button>
+            </div>
+        </ion-card>
 
         <ion-card *ngIf="remindersEnabled && event">
             <ion-item>

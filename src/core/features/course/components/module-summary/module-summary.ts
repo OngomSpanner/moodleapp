@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { CoreConstants } from '@/core/constants';
+import { CoreConstants, DownloadStatus } from '@/core/constants';
 import { AddonBlog } from '@addons/blog/services/blog';
-import { AddonBlogMainMenuHandlerService } from '@addons/blog/services/handlers/mainmenu';
+import { ADDON_BLOG_MAINMENU_PAGE_NAME } from '@addons/blog/constants';
 import { Component, Input, OnDestroy, OnInit } from '@angular/core';
 import { Params } from '@angular/router';
 import { CoreCourse } from '@features/course/services/course';
@@ -216,15 +216,15 @@ export class CoreCourseModuleSummaryComponent implements OnInit, OnDestroy {
         const moduleInfo =
             await CoreCourseHelper.getModulePrefetchInfo(this.module, this.courseId, refresh, this.component);
 
-        this.canPrefetch = moduleInfo.status != CoreConstants.NOT_DOWNLOADABLE;
+        this.canPrefetch = moduleInfo.status !== DownloadStatus.NOT_DOWNLOADABLE;
         this.downloadTimeReadable = '';
 
         if (this.canPrefetch) {
             if (moduleInfo.downloadTime && moduleInfo.downloadTime > 0) {
                 this.downloadTimeReadable = CoreTextUtils.ucFirst(moduleInfo.downloadTimeReadable);
             }
-            this.prefetchLoading = moduleInfo.status == CoreConstants.DOWNLOADING;
-            this.prefetchDisabled = moduleInfo.status == CoreConstants.DOWNLOADED;
+            this.prefetchLoading = moduleInfo.status === DownloadStatus.DOWNLOADING;
+            this.prefetchDisabled = moduleInfo.status === DownloadStatus.DOWNLOADED;
         }
 
         if (moduleInfo.size && moduleInfo.size > 0) {
@@ -238,7 +238,7 @@ export class CoreCourseModuleSummaryComponent implements OnInit, OnDestroy {
     async gotoBlog(): Promise<void> {
         const params: Params = { cmId: this.moduleId };
 
-        await CoreNavigator.navigateToSitePath(AddonBlogMainMenuHandlerService.PAGE_NAME, { params });
+        await CoreNavigator.navigateToSitePath(ADDON_BLOG_MAINMENU_PAGE_NAME, { params });
     }
 
     /**

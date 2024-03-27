@@ -234,7 +234,7 @@ class behat_app_helper extends behat_base {
 
             $this->runtime_js("init($initoptions)");
         } catch (Exception $error) {
-            throw new DriverException('Moodle App not running or not running on Automated mode.');
+            throw new DriverException('Moodle App not running or not running on Automated mode: ' . $error->getMessage());
         }
 
         if ($restart) {
@@ -292,6 +292,8 @@ class behat_app_helper extends behat_base {
     /**
      * Replaces $WWWROOT for the url of the Moodle site.
      *
+     * Using $WWWROOTPATTERN will replace it for a regex pattern.
+     *
      * @Transform /^(.*\$WWWROOT.*)$/
      * @param string $text Text.
      * @return string
@@ -299,7 +301,10 @@ class behat_app_helper extends behat_base {
     public function replace_wwwroot($text) {
         global $CFG;
 
-        return str_replace('$WWWROOT', $CFG->behat_wwwroot, $text);
+        $text = str_replace('$WWWROOTPATTERN', preg_quote($CFG->behat_wwwroot, '/'), $text);
+        $text = str_replace('$WWWROOT', $CFG->behat_wwwroot, $text);
+
+        return $text;
     }
 
     /**

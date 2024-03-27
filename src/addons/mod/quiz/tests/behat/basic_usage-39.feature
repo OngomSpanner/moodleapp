@@ -1,4 +1,4 @@
-@mod @mod_quiz @app @javascript @lms_upto3.9
+@addon_mod_quiz @app @javascript @lms_upto3.9
 Feature: Attempt a quiz in app
   As a student
   In order to demonstrate what I know
@@ -113,7 +113,7 @@ Feature: Attempt a quiz in app
     And I should find "Incomplete answer" within "9" "ion-item" in the app
 
     When I press "Submit all and finish" in the app
-    And I press "OK" in the app
+    And I press "Submit" in the app
     Then I should find "Review" in the app
     And I should find "Finished" in the app
     And I should find "Not yet graded" in the app

@@ -40,39 +40,38 @@ import { CoreEvents } from '@singletons/events';
 import { makeSingleton } from '@singletons';
 
 // Import core services.
-import { CORE_SERVICES } from '@/core/core.module';
-import { CORE_BLOCK_SERVICES } from '@features/block/block.module';
-import { CORE_COMMENTS_SERVICES } from '@features/comments/comments.module';
-import { CORE_CONTENTLINKS_SERVICES } from '@features/contentlinks/contentlinks.module';
-import { CORE_COURSE_SERVICES } from '@features/course/course.module';
-import { CORE_COURSES_SERVICES } from '@features/courses/courses.module';
-import { CORE_EDITOR_SERVICES } from '@features/editor/editor.module';
-import { CORE_ENROL_SERVICES } from '@features/enrol/enrol.module';
-import { CORE_NATIVE_SERVICES } from '@features/native/native.module';
-import { CORE_FILEUPLOADER_SERVICES } from '@features/fileuploader/fileuploader.module';
-import { CORE_FILTER_SERVICES } from '@features/filter/filter.module';
-import { CORE_GRADES_SERVICES } from '@features/grades/grades.module';
-import { CORE_H5P_SERVICES } from '@features/h5p/h5p.module';
-import { CORE_LOGIN_SERVICES } from '@features/login/login.module';
-import { CORE_MAINMENU_SERVICES } from '@features/mainmenu/mainmenu.module';
-import { CORE_PUSHNOTIFICATIONS_SERVICES } from '@features/pushnotifications/pushnotifications.module';
-import { CORE_QUESTION_SERVICES } from '@features/question/question.module';
-import { CORE_SHAREDFILES_SERVICES } from '@features/sharedfiles/sharedfiles.module';
-import { CORE_RATING_SERVICES } from '@features/rating/rating.module';
-import { CORE_SEARCH_SERVICES } from '@features/search/search.module';
-import { CORE_SETTINGS_SERVICES } from '@features/settings/settings.module';
-import { CORE_SITEHOME_SERVICES } from '@features/sitehome/sitehome.module';
-import { CORE_TAG_SERVICES } from '@features/tag/tag.module';
-import { CORE_STYLE_SERVICES } from '@features/styles/styles.module';
-import { CORE_USER_SERVICES } from '@features/user/user.module';
-import { CORE_XAPI_SERVICES } from '@features/xapi/xapi.module';
-import { CoreSitePluginsProvider } from '@features/siteplugins/services/siteplugins';
+import { getCoreServices } from '@/core/core.module';
+import { getBlockServices } from '@features/block/block.module';
+import { getCommentsServices } from '@features/comments/comments.module';
+import { getContentLinksServices } from '@features/contentlinks/contentlinks.module';
+import { getCourseServices } from '@features/course/course.module';
+import { getCoursesServices } from '@features/courses/courses.module';
+import { getEditorServices } from '@features/editor/editor.module';
+import { getEnrolServices } from '@features/enrol/enrol.module';
+import { getFileUploadedServices } from '@features/fileuploader/fileuploader.module';
+import { getFilterServices } from '@features/filter/filter.module';
+import { getGradesServices } from '@features/grades/grades.module';
+import { getH5PServices } from '@features/h5p/h5p.module';
+import { getLoginServices } from '@features/login/login.module';
+import { getMainMenuServices } from '@features/mainmenu/mainmenu.module';
+import { getNativeServices } from '@features/native/native.module';
+import { getPushNotificationsServices } from '@features/pushnotifications/pushnotifications.module';
+import { getQuestionServices } from '@features/question/question.module';
+import { getRatingServices } from '@features/rating/rating.module';
+import { getSearchServices } from '@features/search/search.module';
+import { getSettingsServices } from '@features/settings/settings.module';
+import { getSharedFilesServices } from '@features/sharedfiles/sharedfiles.module';
+import { getSiteHomeServices } from '@features/sitehome/sitehome.module';
+import { getStyleServices } from '@features/styles/styles.module';
+import { getTagServices } from '@features/tag/tag.module';
+import { getUsersServices } from '@features/user/user.module';
+import { getXAPIServices } from '@features/xapi/xapi.module';
 
 // Import other libraries and providers.
 import { DomSanitizer } from '@angular/platform-browser';
 import { FormBuilder, Validators } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
-import { CoreConstants } from '@/core/constants';
+import { CoreConstants, DownloadStatus } from '@/core/constants';
 import moment from 'moment-timezone';
 import { Md5 } from 'ts-md5/dist/md5';
 
@@ -124,41 +123,25 @@ import { CoreSitePluginsAssignFeedbackComponent } from '@features/siteplugins/co
 import { CoreSitePluginsAssignSubmissionComponent } from '@features/siteplugins/components/assign-submission/assign-submission';
 
 // Import addon providers. Do not import database module because it causes circular dependencies.
-import { ADDON_BADGES_SERVICES } from '@addons/badges/badges.module';
-import { ADDON_CALENDAR_SERVICES } from '@addons/calendar/calendar.module';
-import { ADDON_COURSECOMPLETION_SERVICES } from '@addons/coursecompletion/coursecompletion.module';
-import { ADDON_COMPETENCY_SERVICES } from '@addons/competency/competency.module';
-import { ADDON_MESSAGEOUTPUT_SERVICES } from '@addons/messageoutput/messageoutput.module';
-import { ADDON_MESSAGES_SERVICES } from '@addons/messages/messages.module';
-import { ADDON_MOD_ASSIGN_SERVICES } from '@addons/mod/assign/assign.module';
-import { ADDON_MOD_BOOK_SERVICES } from '@addons/mod/book/book.module';
-import { ADDON_MOD_CHAT_SERVICES } from '@addons/mod/chat/chat.module';
-import { ADDON_MOD_CHOICE_SERVICES } from '@addons/mod/choice/choice.module';
-import { ADDON_MOD_FEEDBACK_SERVICES } from '@addons/mod/feedback/feedback.module';
-import { ADDON_MOD_FOLDER_SERVICES } from '@addons/mod/folder/folder.module';
-import { ADDON_MOD_FORUM_SERVICES } from '@addons/mod/forum/forum.module';
-import { ADDON_MOD_GLOSSARY_SERVICES } from '@addons/mod/glossary/glossary.module';
-import { ADDON_MOD_H5P_ACTIVITY_SERVICES } from '@addons/mod/h5pactivity/h5pactivity.module';
-import { ADDON_MOD_IMSCP_SERVICES } from '@addons/mod/imscp/imscp.module';
-import { ADDON_MOD_LESSON_SERVICES } from '@addons/mod/lesson/lesson.module';
-import { ADDON_MOD_LTI_SERVICES } from '@addons/mod/lti/lti.module';
-import { ADDON_MOD_PAGE_SERVICES } from '@addons/mod/page/page.module';
-import { ADDON_MOD_QUIZ_SERVICES } from '@addons/mod/quiz/quiz.module';
-import { ADDON_MOD_RESOURCE_SERVICES } from '@addons/mod/resource/resource.module';
-import { ADDON_MOD_SCORM_SERVICES } from '@addons/mod/scorm/scorm.module';
-import { ADDON_MOD_SURVEY_SERVICES } from '@addons/mod/survey/survey.module';
-import { ADDON_MOD_URL_SERVICES } from '@addons/mod/url/url.module';
-import { ADDON_MOD_WIKI_SERVICES } from '@addons/mod/wiki/wiki.module';
-import { getWorkshopComponentModules, getWorkshopServices } from '@addons/mod/workshop/workshop.module';
-import { ADDON_NOTES_SERVICES } from '@addons/notes/notes.module';
-import { ADDON_NOTIFICATIONS_SERVICES } from '@addons/notifications/notifications.module';
-import { ADDON_PRIVATEFILES_SERVICES } from '@addons/privatefiles/privatefiles.module';
+import { getBadgesServices } from '@addons/badges/badges.module';
+import { getCalendarServices } from '@addons/calendar/calendar.module';
+import { getCompetencyServices } from '@addons/competency/competency.module';
+import { getCourseCompletionServices } from '@addons/coursecompletion/coursecompletion.module';
+import { getMessageOutputServices } from '@addons/messageoutput/messageoutput.module';
+import { getMessagesServices } from '@addons/messages/messages.module';
+import { getModAssignComponentModules, getModAssignServices } from '@addons/mod/assign/assign.module';
+import { getModQuizComponentModules, getModQuizServices } from '@addons/mod/quiz/quiz.module';
+import { getModWorkshopComponentModules, getModWorkshopServices } from '@addons/mod/workshop/workshop.module';
+import { getNotesServices } from '@addons/notes/notes.module';
+import { getNotificationsServices } from '@addons/notifications/notifications.module';
+import { getPrivateFilesServices } from '@addons/privatefiles/privatefiles.module';
 
 // Import some addon modules that define components, directives and pipes. Only import the important ones.
-import { AddonModAssignComponentsModule } from '@addons/mod/assign/components/components.module';
 import { CorePromisedValue } from '@classes/promised-value';
 import { CorePlatform } from '@services/platform';
+
 import { CoreAutoLogoutService } from '@features/autologout/services/autologout';
+import { CoreSitePluginsProvider } from '@features/siteplugins/services/siteplugins';
 
 /**
  * Service to provide functionalities regarding compiling dynamic HTML and Javascript.
@@ -176,13 +159,22 @@ export class CoreCompileProvider {
 
     // List of imports for dynamic module. Since the template can have any component we need to import all core components modules.
     protected readonly IMPORTS = [
-        CoreSharedModule, CoreCourseComponentsModule, CoreCoursesComponentsModule, CoreUserComponentsModule,
-        CoreCourseDirectivesModule, CoreQuestionComponentsModule, AddonModAssignComponentsModule,
-        CoreBlockComponentsModule, CoreEditorComponentsModule, CoreSearchComponentsModule, CoreSitePluginsDirectivesModule,
+        CoreSharedModule,
+        CoreCourseComponentsModule,
+        CoreCoursesComponentsModule,
+        CoreUserComponentsModule,
+        CoreCourseDirectivesModule,
+        CoreQuestionComponentsModule,
+        CoreBlockComponentsModule,
+        CoreEditorComponentsModule,
+        CoreSearchComponentsModule,
+        CoreSitePluginsDirectivesModule,
     ];
 
     protected readonly LAZY_IMPORTS = [
-        getWorkshopComponentModules,
+        getModAssignComponentModules,
+        getModQuizComponentModules,
+        getModWorkshopComponentModules,
     ];
 
     constructor(protected injector: Injector) {
@@ -212,7 +204,7 @@ export class CoreCompileProvider {
 
         const lazyImports = await Promise.all(this.LAZY_IMPORTS.map(getModules => getModules()));
         const imports = [
-            ...CoreArray.flatten(lazyImports),
+            ...lazyImports.flat(),
             ...this.IMPORTS,
             ...extraImports,
             TranslatePipeForCompile,
@@ -277,64 +269,10 @@ export class CoreCompileProvider {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     injectLibraries(instance: any, extraProviders: Type<unknown>[] = []): void {
         const providers = [
-            ...CORE_SERVICES,
-            CoreAutoLogoutService,
-            ...CORE_BLOCK_SERVICES,
-            ...CORE_COMMENTS_SERVICES,
-            ...CORE_CONTENTLINKS_SERVICES,
-            ...CORE_COURSE_SERVICES,
-            ...CORE_COURSES_SERVICES,
-            ...CORE_EDITOR_SERVICES,
-            ...CORE_ENROL_SERVICES,
-            ...CORE_FILEUPLOADER_SERVICES,
-            ...CORE_FILTER_SERVICES,
-            ...CORE_GRADES_SERVICES,
-            ...CORE_H5P_SERVICES,
-            ...CORE_MAINMENU_SERVICES,
-            ...CORE_LOGIN_SERVICES,
-            ...CORE_QUESTION_SERVICES,
-            ...CORE_PUSHNOTIFICATIONS_SERVICES,
-            ...CORE_RATING_SERVICES,
-            ...CORE_SEARCH_SERVICES,
-            ...CORE_SETTINGS_SERVICES,
-            ...CORE_SHAREDFILES_SERVICES,
-            ...CORE_SITEHOME_SERVICES,
-            CoreSitePluginsProvider,
-            ...CORE_TAG_SERVICES,
-            ...CORE_STYLE_SERVICES,
-            ...CORE_USER_SERVICES,
-            ...CORE_XAPI_SERVICES,
-            ...CORE_NATIVE_SERVICES,
-            ...this.OTHER_SERVICES,
             ...extraProviders,
-            ...ADDON_BADGES_SERVICES,
-            ...ADDON_CALENDAR_SERVICES,
-            ...ADDON_COURSECOMPLETION_SERVICES,
-            ...ADDON_COMPETENCY_SERVICES,
-            ...ADDON_MESSAGEOUTPUT_SERVICES,
-            ...ADDON_MESSAGES_SERVICES,
-            ...ADDON_MOD_ASSIGN_SERVICES,
-            ...ADDON_MOD_BOOK_SERVICES,
-            ...ADDON_MOD_CHAT_SERVICES,
-            ...ADDON_MOD_CHOICE_SERVICES,
-            ...ADDON_MOD_FEEDBACK_SERVICES,
-            ...ADDON_MOD_FOLDER_SERVICES,
-            ...ADDON_MOD_FORUM_SERVICES,
-            ...ADDON_MOD_GLOSSARY_SERVICES,
-            ...ADDON_MOD_H5P_ACTIVITY_SERVICES,
-            ...ADDON_MOD_IMSCP_SERVICES,
-            ...ADDON_MOD_LESSON_SERVICES,
-            ...ADDON_MOD_LTI_SERVICES,
-            ...ADDON_MOD_PAGE_SERVICES,
-            ...ADDON_MOD_QUIZ_SERVICES,
-            ...ADDON_MOD_RESOURCE_SERVICES,
-            ...ADDON_MOD_SCORM_SERVICES,
-            ...ADDON_MOD_SURVEY_SERVICES,
-            ...ADDON_MOD_URL_SERVICES,
-            ...ADDON_MOD_WIKI_SERVICES,
-            ...ADDON_NOTES_SERVICES,
-            ...ADDON_NOTIFICATIONS_SERVICES,
-            ...ADDON_PRIVATEFILES_SERVICES,
+            CoreAutoLogoutService,
+            CoreSitePluginsProvider,
+            ...this.OTHER_SERVICES,
         ];
 
         // We cannot inject anything to this constructor. Use the Injector to inject all the providers into the instance.
@@ -357,6 +295,7 @@ export class CoreCompileProvider {
         instance['injector'] = this.injector;
         instance['Validators'] = Validators;
         instance['CoreConstants'] = CoreConstants;
+        instance['DownloadStatus'] = DownloadStatus;
         instance['CoreConfigConstants'] = CoreConstants.CONFIG;
         instance['CoreEventsProvider'] = CoreEvents;
         instance['CoreLoggerProvider'] = CoreLogger;
@@ -409,11 +348,48 @@ export class CoreCompileProvider {
      * @returns Lazy libraries.
      */
     async getLazyLibraries(): Promise<Type<unknown>[]> {
-        const ADDON_MOD_WORKSHOP_SERVICES = await getWorkshopServices();
+        const services = await Promise.all([
+            getCoreServices(),
+            getBlockServices(),
+            getCommentsServices(),
+            getContentLinksServices(),
+            getCourseServices(),
+            getCoursesServices(),
+            getEditorServices(),
+            getEnrolServices(),
+            getFileUploadedServices(),
+            getFilterServices(),
+            getGradesServices(),
+            getH5PServices(),
+            getLoginServices(),
+            getMainMenuServices(),
+            getNativeServices(),
+            getPushNotificationsServices(),
+            getQuestionServices(),
+            getRatingServices(),
+            getSearchServices(),
+            getSettingsServices(),
+            getSharedFilesServices(),
+            getSiteHomeServices(),
+            getStyleServices(),
+            getTagServices(),
+            getUsersServices(),
+            getXAPIServices(),
+            getBadgesServices(),
+            getCalendarServices(),
+            getCompetencyServices(),
+            getCourseCompletionServices(),
+            getMessageOutputServices(),
+            getMessagesServices(),
+            getModAssignServices(),
+            getModQuizServices(),
+            getModWorkshopServices(),
+            getNotesServices(),
+            getNotificationsServices(),
+            getPrivateFilesServices(),
+        ]);
 
-        return [
-            ...ADDON_MOD_WORKSHOP_SERVICES,
-        ];
+        return services.flat();
     }
 
 }

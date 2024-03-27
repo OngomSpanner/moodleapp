@@ -22,12 +22,17 @@ import { CoreSitesCommonWSOptions, CoreSites, CoreSitesReadingStrategy } from '@
 import { CoreTimeUtils } from '@services/utils/time';
 import { CoreUtils } from '@services/utils/utils';
 import { CoreSite } from '@classes/sites/site';
-import { CoreConstants } from '@/core/constants';
+import { CoreConstants, DownloadStatus, TDownloadStatus } from '@/core/constants';
 import { makeSingleton, Translate } from '@singletons';
 import { CoreStatusWithWarningsWSResponse, CoreWSExternalFile, CoreWSExternalWarning } from '@services/ws';
 
 import {
-    CoreCourseStatusDBRecord, CoreCourseViewedModulesDBRecord, COURSE_STATUS_TABLE, COURSE_VIEWED_MODULES_TABLE ,
+    CoreCourseStatusDBRecord,
+    CoreCourseViewedModulesDBPrimaryKeys,
+    CoreCourseViewedModulesDBRecord,
+    COURSE_STATUS_TABLE,
+    COURSE_VIEWED_MODULES_PRIMARY_KEYS,
+    COURSE_VIEWED_MODULES_TABLE,
 } from './database/course';
 import { CoreCourseOffline } from './course-offline';
 import { CoreError } from '@classes/errors/error';
@@ -51,7 +56,6 @@ import { lazyMap, LazyMap } from '@/core/utils/lazy-map';
 import { asyncInstance, AsyncInstance } from '@/core/utils/async-instance';
 import { CoreDatabaseTable } from '@classes/database/database-table';
 import { CoreDatabaseCachingStrategy } from '@classes/database/database-table-proxy';
-import { SQLiteDB } from '@classes/sqlitedb';
 import { CorePlatform } from '@services/platform';
 import { asyncObservable } from '@/core/utils/rxjs';
 import { firstValueFrom } from 'rxjs';
@@ -121,7 +125,9 @@ export class CoreCourseProvider {
 
     protected logger: CoreLogger;
     protected statusTables: LazyMap<AsyncInstance<CoreDatabaseTable<CoreCourseStatusDBRecord>>>;
-    protected viewedModulesTables: LazyMap<AsyncInstance<CoreDatabaseTable<CoreCourseViewedModulesDBRecord, 'courseId' | 'cmId'>>>;
+    protected viewedModulesTables: LazyMap<
+        AsyncInstance<CoreDatabaseTable<CoreCourseViewedModulesDBRecord, CoreCourseViewedModulesDBPrimaryKeys, never>>
+    >;
 
     constructor() {
         this.logger = CoreLogger.getInstance('CoreCourseProvider');
@@ -137,12 +143,16 @@ export class CoreCourseProvider {
 
         this.viewedModulesTables = lazyMap(
             siteId => asyncInstance(
-                () => CoreSites.getSiteTable<CoreCourseViewedModulesDBRecord, 'courseId' | 'cmId'>(COURSE_VIEWED_MODULES_TABLE, {
-                    siteId,
-                    config: { cachingStrategy: CoreDatabaseCachingStrategy.None },
-                    primaryKeyColumns: ['courseId', 'cmId'],
-                    onDestroy: () => delete this.viewedModulesTables[siteId],
-                }),
+                () => CoreSites.getSiteTable<CoreCourseViewedModulesDBRecord, CoreCourseViewedModulesDBPrimaryKeys, never>(
+                    COURSE_VIEWED_MODULES_TABLE,
+                    {
+                        siteId,
+                        config: { cachingStrategy: CoreDatabaseCachingStrategy.None },
+                        primaryKeyColumns: [...COURSE_VIEWED_MODULES_PRIMARY_KEYS],
+                        rowIdColumn: null,
+                        onDestroy: () => delete this.viewedModulesTables[siteId],
+                    },
+                ),
             ),
         );
     }
@@ -258,7 +268,11 @@ export class CoreCourseProvider {
         this.logger.debug('Clear all course status for site ' + site.id);
 
         await this.statusTables[site.getId()].delete();
-        this.triggerCourseStatusChanged(CoreCourseProvider.ALL_COURSES_CLEARED, CoreConstants.NOT_DOWNLOADED, site.id);
+        this.triggerCourseStatusChanged(
+            CoreCourseProvider.ALL_COURSES_CLEARED,
+            DownloadStatus.DOWNLOADABLE_NOT_DOWNLOADED,
+            site.id,
+        );
     }
 
     /**
@@ -380,12 +394,9 @@ export class CoreCourseProvider {
         }
 
         const site = await CoreSites.getSite(siteId);
-
-        const whereAndParams = SQLiteDB.getInOrEqual(ids);
-
         const entries = await this.viewedModulesTables[site.getId()].getManyWhere({
-            sql: 'cmId ' + whereAndParams.sql,
-            sqlParams: whereAndParams.params,
+            sql: `cmId IN (${ids.map(() => '?').join(', ')})`,
+            sqlParams: ids,
             js: (record) => ids.includes(record.cmId),
         });
 
@@ -466,13 +477,13 @@ export class CoreCourseProvider {
      * @param siteId Site ID. If not defined, current site.
      * @returns Promise resolved with the status.
      */
-    async getCourseStatus(courseId: number, siteId?: string): Promise<string> {
+    async getCourseStatus(courseId: number, siteId?: string): Promise<TDownloadStatus> {
         try {
             const entry = await this.getCourseStatusData(courseId, siteId);
 
-            return entry.status || CoreConstants.NOT_DOWNLOADED;
+            return entry.status || DownloadStatus.DOWNLOADABLE_NOT_DOWNLOADED;
         } catch {
-            return CoreConstants.NOT_DOWNLOADED;
+            return DownloadStatus.DOWNLOADABLE_NOT_DOWNLOADED;
         }
     }
 
@@ -483,7 +494,8 @@ export class CoreCourseProvider {
      * @returns Resolves with an array containing downloaded course ids.
      */
     async getDownloadedCourseIds(siteId?: string): Promise<number[]> {
-        const downloadedStatuses = [CoreConstants.DOWNLOADED, CoreConstants.DOWNLOADING, CoreConstants.OUTDATED];
+        const downloadedStatuses: TDownloadStatus[] =
+            [DownloadStatus.DOWNLOADED, DownloadStatus.DOWNLOADING, DownloadStatus.OUTDATED];
         const site = await CoreSites.getSite(siteId);
         const entries = await this.statusTables[site.getId()].getManyWhere({
             sql: 'status IN (?,?,?)',
@@ -825,14 +837,29 @@ export class CoreCourseProvider {
             moduleName = 'external-tool';
         }
 
-        let path = 'assets/img/mod/';
-        if (!CoreSites.getCurrentSite()?.isVersionGreaterEqualThan('4.0')) {
-            // @deprecatedonmoodle since 3.11.
-            path = 'assets/img/mod_legacy/';
-        }
+        const path = this.getModuleIconsPath();
 
         // Use default icon on core modules.
         return path + moduleName + '.svg';
+    }
+
+    /**
+     * Get the path where the module icons are stored.
+     *
+     * @returns Path.
+     */
+    getModuleIconsPath(): string {
+        if (!CoreSites.getCurrentSite()?.isVersionGreaterEqualThan('4.0')) {
+            // @deprecatedonmoodle since 3.11.
+            return 'assets/img/mod_legacy/';
+        }
+
+        if (!CoreSites.getCurrentSite()?.isVersionGreaterEqualThan('4.4')) {
+            // @deprecatedonmoodle since 4.3.
+            return 'assets/img/mod_40/';
+        }
+
+        return 'assets/img/mod/';
     }
 
     /**
@@ -1376,7 +1403,7 @@ export class CoreCourseProvider {
      * @param siteId Site ID. If not defined, current site.
      * @returns Promise resolved when the status is changed. Resolve param: new status.
      */
-    async setCoursePreviousStatus(courseId: number, siteId?: string): Promise<string> {
+    async setCoursePreviousStatus(courseId: number, siteId?: string): Promise<TDownloadStatus> {
         siteId = siteId || CoreSites.getCurrentSiteId();
 
         this.logger.debug(`Set previous status for course ${courseId} in site ${siteId}`);
@@ -1388,10 +1415,10 @@ export class CoreCourseProvider {
 
         const newData = {
             id: courseId,
-            status: entry.previous || CoreConstants.NOT_DOWNLOADED,
+            status: entry.previous || DownloadStatus.DOWNLOADABLE_NOT_DOWNLOADED,
             updated: Date.now(),
             // Going back from downloading to previous status, restore previous download time.
-            downloadTime: entry.status == CoreConstants.DOWNLOADING ? entry.previousDownloadTime : entry.downloadTime,
+            downloadTime: entry.status == DownloadStatus.DOWNLOADING ? entry.previousDownloadTime : entry.downloadTime,
         };
 
         await this.statusTables[site.getId()].update(newData, { id: courseId });
@@ -1409,7 +1436,7 @@ export class CoreCourseProvider {
      * @param siteId Site ID. If not defined, current site.
      * @returns Promise resolved when the status is stored.
      */
-    async setCourseStatus(courseId: number, status: string, siteId?: string): Promise<void> {
+    async setCourseStatus(courseId: number, status: TDownloadStatus, siteId?: string): Promise<void> {
         siteId = siteId || CoreSites.getCurrentSiteId();
 
         this.logger.debug(`Set status '${status}' for course ${courseId} in site ${siteId}`);
@@ -1417,9 +1444,9 @@ export class CoreCourseProvider {
         const site = await CoreSites.getSite(siteId);
         let downloadTime = 0;
         let previousDownloadTime = 0;
-        let previousStatus = '';
+        let previousStatus: TDownloadStatus | undefined;
 
-        if (status == CoreConstants.DOWNLOADING) {
+        if (status === DownloadStatus.DOWNLOADING) {
             // Set download time if course is now downloading.
             downloadTime = CoreTimeUtils.timestamp();
         }
@@ -1439,7 +1466,7 @@ export class CoreCourseProvider {
             // New entry.
         }
 
-        if (previousStatus != status) {
+        if (previousStatus !== status) {
             // Status has changed, update it.
             await this.statusTables[site.getId()].insert({
                 id: courseId,
@@ -1507,7 +1534,7 @@ export class CoreCourseProvider {
      * @param status New course status.
      * @param siteId Site ID. If not defined, current site.
      */
-    protected triggerCourseStatusChanged(courseId: number, status: string, siteId?: string): void {
+    protected triggerCourseStatusChanged(courseId: number, status: TDownloadStatus, siteId?: string): void {
         CoreEvents.trigger(CoreEvents.COURSE_STATUS_CHANGED, {
             courseId: courseId,
             status: status,
@@ -1728,6 +1755,8 @@ export type CoreCourseGetContentsWSModule = {
     visibleoncoursepage: number; // Is the module visible on course page. Cannot be undefined.
     modicon: string; // Activity icon url.
     modname: string; // Activity module type.
+    purpose?: string; // @since 4.4 The module purpose.
+    branded?: boolean; // @since 4.4 Whether the module is branded or not.
     modplural: string; // Activity module plural name.
     availability?: string; // Module availability settings.
     indent: number; // Number of identation in the site.

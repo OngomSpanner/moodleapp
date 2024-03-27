@@ -17,7 +17,7 @@ import { CoreSites } from '@services/sites';
 import { CoreTimeUtils } from '@services/utils/time';
 import { makeSingleton } from '@singletons';
 import { COMMENTS_TABLE, COMMENTS_DELETED_TABLE, CoreCommentsDBRecord, CoreCommentsDeletedDBRecord } from './database/comments';
-import { CoreArray } from '@singletons/array';
+import { ContextLevel } from '@/core/constants';
 
 /**
  * Service to handle offline comments.
@@ -38,7 +38,7 @@ export class CoreCommentsOfflineProvider {
             site.getDb().getRecords<CoreCommentsDeletedDBRecord>(COMMENTS_DELETED_TABLE),
         ]);
 
-        return CoreArray.flatten<CoreCommentsDBRecord | CoreCommentsDeletedDBRecord>(results);
+        return results.flat();
     }
 
     /**
@@ -53,7 +53,7 @@ export class CoreCommentsOfflineProvider {
      * @returns Promise resolved with the comments.
      */
     async getComment(
-        contextLevel: string,
+        contextLevel: ContextLevel,
         instanceId: number,
         component: string,
         itemId: number,
@@ -87,7 +87,7 @@ export class CoreCommentsOfflineProvider {
      * @returns Promise resolved with the comments.
      */
     async getComments(
-        contextLevel: string,
+        contextLevel: ContextLevel,
         instanceId: number,
         component: string,
         itemId: number,
@@ -132,7 +132,7 @@ export class CoreCommentsOfflineProvider {
      * @returns Promise resolved with the comments.
      */
     async getDeletedComments(
-        contextLevel: string,
+        contextLevel: ContextLevel,
         instanceId: number,
         component: string,
         itemId: number,
@@ -166,7 +166,7 @@ export class CoreCommentsOfflineProvider {
      * @returns Promise resolved if deleted, rejected if failure.
      */
     async removeComment(
-        contextLevel: string,
+        contextLevel: ContextLevel,
         instanceId: number,
         component: string,
         itemId: number,
@@ -196,7 +196,7 @@ export class CoreCommentsOfflineProvider {
      * @returns Promise resolved if deleted, rejected if failure.
      */
     async removeDeletedComments(
-        contextLevel: string,
+        contextLevel: ContextLevel,
         instanceId: number,
         component: string,
         itemId: number,
@@ -228,7 +228,7 @@ export class CoreCommentsOfflineProvider {
      */
     async saveComment(
         content: string,
-        contextLevel: string,
+        contextLevel: ContextLevel,
         instanceId: number,
         component: string,
         itemId: number,
@@ -266,7 +266,7 @@ export class CoreCommentsOfflineProvider {
      */
     async deleteComment(
         commentId: number,
-        contextLevel: string,
+        contextLevel: ContextLevel,
         instanceId: number,
         component: string,
         itemId: number,

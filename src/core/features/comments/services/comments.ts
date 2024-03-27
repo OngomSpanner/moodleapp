@@ -24,6 +24,7 @@ import { CoreEvents } from '@singletons/events';
 import { CoreCommentsOffline } from './comments-offline';
 import { CoreCommentsSyncAutoSyncData, CoreCommentsSyncProvider } from './comments-sync';
 import { CoreSiteWSPreSets } from '@classes/sites/authenticated-site';
+import { ContextLevel } from '@/core/constants';
 
 const ROOT_CACHE_KEY = 'mmComments:';
 
@@ -80,7 +81,7 @@ export class CoreCommentsProvider {
      */
     async addComment(
         content: string,
-        contextLevel: string,
+        contextLevel: ContextLevel,
         instanceId: number,
         component: string,
         itemId: number,
@@ -128,7 +129,7 @@ export class CoreCommentsProvider {
      */
     async addCommentOnline(
         content: string,
-        contextLevel: string,
+        contextLevel: ContextLevel,
         instanceId: number,
         component: string,
         itemId: number,
@@ -181,15 +182,14 @@ export class CoreCommentsProvider {
     }
 
     /**
-     * Check if Calendar is disabled in a certain site.
+     * Check if comments are disabled in a certain site.
      *
      * @param site Site. If not defined, use current site.
      * @returns Whether it's disabled.
+     * @deprecated since 4.4. Use areCommentsEnabledInSite instead.
      */
     areCommentsDisabledInSite(site?: CoreSite): boolean {
-        site = site || CoreSites.getCurrentSite();
-
-        return !!site?.isFeatureDisabled('NoDelegate_CoreComments');
+        return !this.areCommentsEnabledInSite(site);
     }
 
     /**
@@ -197,11 +197,38 @@ export class CoreCommentsProvider {
      *
      * @param siteId Site Id. If not defined, use current site.
      * @returns Promise resolved with true if disabled, rejected or resolved with false otherwise.
+     * @deprecated since 4.4. Use areCommentsEnabled instead.
      */
     async areCommentsDisabled(siteId?: string): Promise<boolean> {
+        return !this.areCommentsEnabled(siteId);
+    }
+
+    /**
+     * Check if comments are enabled in a certain site.
+     *
+     * @param site Site. If not defined, use current site.
+     * @returns Whether it's enabled.
+     */
+    areCommentsEnabledInSite(site?: CoreSite): boolean {
+        site = site || CoreSites.getCurrentSite();
+
+        if (!site) {
+            return false;
+        }
+
+        return site.canUseAdvancedFeature('usecomments') && !site.isFeatureDisabled('NoDelegate_CoreComments');
+    }
+
+    /**
+     * Check if comments are enabled in a certain site.
+     *
+     * @param siteId Site Id. If not defined, use current site.
+     * @returns Promise resolved with true if enabled, rejected or resolved with false otherwise.
+     */
+    async areCommentsEnabled(siteId?: string): Promise<boolean> {
         const site = await CoreSites.getSite(siteId);
 
-        return this.areCommentsDisabledInSite(site);
+        return this.areCommentsEnabledInSite(site);
     }
 
     /**
@@ -292,7 +319,7 @@ export class CoreCommentsProvider {
      */
     async deleteCommentsOnline(
         commentIds: number[],
-        contextLevel: string,
+        contextLevel: ContextLevel,
         instanceId: number,
         component: string,
         itemId: number,
@@ -323,7 +350,7 @@ export class CoreCommentsProvider {
         const site = await CoreSites.getSite(siteId);
 
         // First check if it's disabled.
-        if (this.areCommentsDisabledInSite(site)) {
+        if (!this.areCommentsEnabledInSite(site)) {
             return false;
         }
 
@@ -341,7 +368,7 @@ export class CoreCommentsProvider {
      * @returns Cache key.
      */
     protected getCommentsCacheKey(
-        contextLevel: string,
+        contextLevel: ContextLevel,
         instanceId: number,
         component: string,
         itemId: number,
@@ -357,7 +384,7 @@ export class CoreCommentsProvider {
      * @param instanceId The Instance id of item associated with the context level.
      * @returns Cache key.
      */
-    protected getCommentsPrefixCacheKey(contextLevel: string, instanceId: number): string {
+    protected getCommentsPrefixCacheKey(contextLevel: ContextLevel, instanceId: number): string {
         return ROOT_CACHE_KEY + 'comments:' + contextLevel + ':' + instanceId;
     }
 
@@ -374,7 +401,7 @@ export class CoreCommentsProvider {
      * @returns Promise resolved with the comments.
      */
     async getComments(
-        contextLevel: string,
+        contextLevel: ContextLevel,
         instanceId: number,
         component: string,
         itemId: number,
@@ -423,7 +450,7 @@ export class CoreCommentsProvider {
      * @returns Comments count with plus sign if needed.
      */
     async getCommentsCount(
-        contextLevel: string,
+        contextLevel: ContextLevel,
         instanceId: number,
         component: string,
         itemId: number,
@@ -488,7 +515,7 @@ export class CoreCommentsProvider {
      * @returns Promise resolved when the data is invalidated.
      */
     async invalidateCommentsData(
-        contextLevel: string,
+        contextLevel: ContextLevel,
         instanceId: number,
         component: string,
         itemId: number,
@@ -519,7 +546,7 @@ export class CoreCommentsProvider {
      * @param siteId Site ID. If not defined, current site.
      * @returns Promise resolved when the data is invalidated.
      */
-    async invalidateCommentsByInstance(contextLevel: string, instanceId: number, siteId?: string): Promise<void> {
+    async invalidateCommentsByInstance(contextLevel: ContextLevel, instanceId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
 
         await site.invalidateWsCacheForKeyStartingWith(this.getCommentsPrefixCacheKey(contextLevel, instanceId));
@@ -561,7 +588,7 @@ type CoreCommentsAddCommentsWSParams = {
 
 export type CoreCommentsCommentBasicData = {
     id?: number; // Comment ID.
-    contextlevel: string; // Contextlevel system, course, user...
+    contextlevel: ContextLevel; // Contextlevel system, course, user...
     instanceid: number; // The id of item associated with the contextlevel.
     component: string; // Component.
     content: string; // Component.
@@ -602,7 +629,7 @@ type CoreCommentsDeleteCommentsWSParams = {
  * Params of core_comment_get_comments WS.
  */
 type CoreCommentsGetCommentsWSParams = {
-    contextlevel: string; // Contextlevel system, course, user...
+    contextlevel: ContextLevel; // Contextlevel system, course, user...
     instanceid: number; // The Instance id of item associated with the context level.
     component: string; // Component.
     itemid: number; // Associated id.
@@ -626,7 +653,7 @@ export type CoreCommentsGetCommentsWSResponse = {
  * Data sent by COMMENTS_COUNT_CHANGED_EVENT event.
  */
 export type CoreCommentsCountChangedEventData = {
-    contextLevel: string;
+    contextLevel: ContextLevel;
     instanceId: number;
     component: string;
     itemId: number;
@@ -638,7 +665,7 @@ export type CoreCommentsCountChangedEventData = {
  * Data sent by REFRESH_COMMENTS_EVENT event.
  */
 export type CoreCommentsRefreshCommentsEventData = {
-    contextLevel?: string;
+    contextLevel?: ContextLevel;
     instanceId?: number;
     component?: string;
     itemId?: number;

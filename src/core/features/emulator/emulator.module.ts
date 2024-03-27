@@ -22,7 +22,6 @@ import { Camera } from '@awesome-cordova-plugins/camera/ngx';
 import { Clipboard } from '@awesome-cordova-plugins/clipboard/ngx';
 import { File } from '@awesome-cordova-plugins/file/ngx';
 import { FileOpener } from '@awesome-cordova-plugins/file-opener/ngx';
-import { FileTransfer } from '@awesome-cordova-plugins/file-transfer/ngx';
 import { Geolocation } from '@awesome-cordova-plugins/geolocation/ngx';
 import { InAppBrowser } from '@awesome-cordova-plugins/in-app-browser/ngx';
 import { LocalNotifications } from '@awesome-cordova-plugins/local-notifications/ngx';
@@ -34,7 +33,6 @@ import { CameraMock } from './services/camera';
 import { ClipboardMock } from './services/clipboard';
 import { FileMock } from './services/file';
 import { FileOpenerMock } from './services/file-opener';
-import { FileTransferMock } from './services/file-transfer';
 import { GeolocationMock } from './services/geolocation';
 import { InAppBrowserMock } from './services/inappbrowser';
 import { LocalNotificationsMock } from './services/local-notifications';
@@ -44,6 +42,8 @@ import { CorePlatform } from '@services/platform';
 import { CoreLocalNotifications } from '@services/local-notifications';
 import { CoreNative } from '@features/native/services/native';
 import { SecureStorageMock } from '@features/emulator/classes/SecureStorage';
+import { CoreDbProvider } from '@services/db';
+import { CoreDbProviderMock } from '@features/emulator/services/db';
 
 /**
  * This module handles the emulation of Cordova plugins in browser and desktop.
@@ -61,39 +61,35 @@ import { SecureStorageMock } from '@features/emulator/classes/SecureStorage';
     providers: [
         {
             provide: Camera,
-            useFactory: (): Camera => CorePlatform.is('cordova') ? new Camera() : new CameraMock(),
+            useFactory: (): Camera => CorePlatform.isMobile() ? new Camera() : new CameraMock(),
         },
         {
             provide: Clipboard,
-            useFactory: (): Clipboard => CorePlatform.is('cordova') ? new Clipboard() : new ClipboardMock(),
+            useFactory: (): Clipboard => CorePlatform.isMobile() ? new Clipboard() : new ClipboardMock(),
         },
         {
             provide: File,
-            useFactory: (): File => CorePlatform.is('cordova') ? new File() : new FileMock(),
+            useFactory: (): File => CorePlatform.isMobile() ? new File() : new FileMock(),
         },
         {
             provide: FileOpener,
-            useFactory: (): FileOpener => CorePlatform.is('cordova') ? new FileOpener() : new FileOpenerMock(),
-        },
-        {
-            provide: FileTransfer,
-            useFactory: (): FileTransfer => CorePlatform.is('cordova') ? new FileTransfer() : new FileTransferMock(),
+            useFactory: (): FileOpener => CorePlatform.isMobile() ? new FileOpener() : new FileOpenerMock(),
         },
         {
             provide: Geolocation,
-            useFactory: (): Geolocation => CorePlatform.is('cordova') ? new Geolocation() : new GeolocationMock(),
+            useFactory: (): Geolocation => CorePlatform.isMobile() ? new Geolocation() : new GeolocationMock(),
         },
         {
             provide: InAppBrowser,
-            useFactory: (): InAppBrowser => CorePlatform.is('cordova') ? new InAppBrowser() : new InAppBrowserMock(),
+            useFactory: (): InAppBrowser => CorePlatform.isMobile() ? new InAppBrowser() : new InAppBrowserMock(),
         },
         {
             provide: MediaCapture,
-            useFactory: (): MediaCapture => CorePlatform.is('cordova') ? new MediaCapture() : new MediaCaptureMock(),
+            useFactory: (): MediaCapture => CorePlatform.isMobile() ? new MediaCapture() : new MediaCaptureMock(),
         },
         {
             provide: Zip,
-            useFactory: (): Zip => CorePlatform.is('cordova') ? new Zip() : new ZipMock(),
+            useFactory: (): Zip => CorePlatform.isMobile() ? new Zip() : new ZipMock(),
         },
         {
             provide: LocalNotifications,
@@ -102,9 +98,13 @@ import { SecureStorageMock } from '@features/emulator/classes/SecureStorage';
                 : new LocalNotificationsMock(),
         },
         {
+            provide: CoreDbProvider,
+            useFactory: (): CoreDbProvider => CorePlatform.isMobile() ? new CoreDbProvider() : new CoreDbProviderMock(),
+        },
+        {
             provide: APP_INITIALIZER,
             useValue: async () => {
-                if (CorePlatform.is('cordova')) {
+                if (CorePlatform.isMobile()) {
                     return;
                 }
 
